@@ -12,6 +12,8 @@ import Darwin
     @objc(isKeyboardBuiltIn:) func built(_ id: UInt64) -> Bool
     @objc(isAutoBrightnessEnabledForKeyboard:) func auto(_ id: UInt64) -> Bool
     @objc(enableAutoBrightness:forKeyboard:) func setAuto(_ value: Bool, id: UInt64) -> Bool
+    @objc(idleDimTimeForKeyboard:) func idle(_ id: UInt64) -> Double
+    @objc(setIdleDimTime:forKeyboard:) func setIdle(_ value: Double, id: UInt64) -> Bool
 }
 let stateURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/KeyboardPower/original.plist")
 let key = "KeyboardBacklightBrightness"
@@ -23,12 +25,13 @@ let b = unsafeBitCast(bo, to: BrightnessClient.self), k = unsafeBitCast(ko, to: 
 guard let id = k.copyKeyboardBacklightIDs()?.first(where: { k.built($0.uint64Value) })?.uint64Value,
       b.get(key, id: id) != nil else { fputs("No built-in backlight found\n", stderr); exit(1) }
 if CommandLine.arguments.contains("--status") {
-    print("brightness=\(b.get(key, id: id) ?? "unknown") auto=\(k.auto(id))")
+    print("brightness=\(b.get(key, id: id) ?? "unknown") auto=\(k.auto(id)) idleSeconds=\(k.idle(id))")
     exit(0)
 }
 if CommandLine.arguments.contains("--restore") {
     if let state = NSDictionary(contentsOf: stateURL), let original = state["auto"] as? Bool {
         guard k.setAuto(original, id: id), k.auto(id) == original else { fputs("Could not restore automatic brightness\n", stderr); exit(1) }
+        if let idle = state["idleSeconds"] as? Double, !k.setIdle(idle, id: id) { fputs("Could not restore keyboard inactivity setting\n", stderr); exit(1) }
         print("Restored automatic keyboard brightness: \(original)")
     }
     exit(0)
@@ -39,12 +42,20 @@ guard fd >= 0, flock(fd, LOCK_EX | LOCK_NB) == 0 else { fputs("Already running o
 if !FileManager.default.fileExists(atPath: stateURL.path) {
     guard (NSDictionary(dictionary: ["auto": k.auto(id)])).write(to: stateURL, atomically: true) else { fputs("Cannot save original setting\n", stderr); exit(1) }
 }
+if let saved = NSMutableDictionary(contentsOf: stateURL), saved["idleSeconds"] == nil {
+    saved["idleSeconds"] = k.idle(id)
+    guard saved.write(to: stateURL, atomically: true) else { fputs("Cannot save inactivity setting\n", stderr); exit(1) }
+}
 func apply() {
     guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(), let source = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String? else { fputs("Cannot read power source\n", stderr); return }
     let target: Float
     if source == kIOPSACPowerValue { target = 0.90 }
     else if source == kIOPSBatteryPowerValue { target = 0.15 }
     else { fputs("Unknown power source: \(source)\n", stderr); return }
+    if let saved = NSDictionary(contentsOf: stateURL), let originalIdle = saved["idleSeconds"] as? Double {
+        let desiredIdle = source == kIOPSACPowerValue ? 0.0 : originalIdle
+        if k.idle(id) != desiredIdle && !k.setIdle(desiredIdle, id: id) { fputs("Could not set keyboard inactivity timeout\n", stderr) }
+    }
     if k.auto(id) && (!k.setAuto(false, id: id) || k.auto(id)) { fputs("Could not disable keyboard auto brightness\n", stderr); return }
     guard b.set(NSNumber(value: target), key: key, id: id) else { fputs("Brightness write failed\n", stderr); return }
     print("Applied \(target) for \(source)"); fflush(stdout)
