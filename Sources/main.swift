@@ -1,206 +1,218 @@
 import AppKit
-import CoreGraphics
 import SwiftUI
-import Darwin
-import ServiceManagement
-import ScreenCaptureKit
+import UniformTypeIdentifiers
 
-// Each capture uses only the region behind one corner. ScreenCaptureKit excludes
-// the target and any windows in front of it that overlap that region.
-final class CornerView: NSView {
-    var image: CGImage? { didSet { needsDisplay = true } }
-    var corner = 0
-    var radius: CGFloat = 16
-    override var isOpaque: Bool { false }
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext, let image else { return }
-        let w = bounds.width, h = bounds.height
-        // Continuous curve approximation, aligned with the corner of the target.
-        let r = min(radius, w / 1.55, h / 1.55), extent = r * 1.528
-        let p = CGMutablePath()
-        // Clip out a top-left continuous corner, mirrored for other corners.
-        p.move(to: CGPoint(x: 0, y: 0))
-        p.addLine(to: CGPoint(x: extent, y: 0))
-        p.addCurve(to: CGPoint(x: 0, y: extent), control1: CGPoint(x: extent * 0.36, y: 0), control2: CGPoint(x: 0, y: extent * 0.36))
-        p.closeSubpath()
-        ctx.saveGState()
-        // Local graphics coordinates are bottom-left.
-        if corner == 0 || corner == 1 { ctx.translateBy(x: 0, y: h); ctx.scaleBy(x: 1, y: -1) }
-        if corner == 1 || corner == 3 { ctx.translateBy(x: w, y: 0); ctx.scaleBy(x: -1, y: 1) }
-        ctx.addPath(p); ctx.clip()
-        if corner == 1 || corner == 3 { ctx.scaleBy(x: -1, y: 1); ctx.translateBy(x: -w, y: 0) }
-        if corner == 0 || corner == 1 { ctx.scaleBy(x: 1, y: -1); ctx.translateBy(x: 0, y: -h) }
-        // Captures are drawn into the full small corner rectangle.
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        ctx.restoreGState()
-    }
-}
-final class MaskWindow: NSWindow {
-    let maskView = CornerView()
-    init(corner: Int) {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 26, height: 26), styleMask: [.borderless], backing: .buffered, defer: false)
-        isOpaque = false; backgroundColor = .clear; hasShadow = false; ignoresMouseEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        isReleasedWhenClosed = false
-        maskView.corner = corner; contentView = maskView
-    }
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
+struct TargetApp: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var path: String?
+    var isEnabled: Bool
+    var supportsNative: Bool { id == "com.adobe.InDesign" }
 }
 
-final class TrackedWindow {
-    let id: CGWindowID
-    let masks: [MaskWindow] = (0..<4).map { MaskWindow(corner: $0) }
-    var bounds = CGRect.null
-    var captureBusy = false
-    var lastCapture = Date.distantPast
-    var generation = 0
-    var hasImage = false
-    var lastScene = ""
-    init(id: CGWindowID) { self.id = id }
-    func hide() { masks.forEach { $0.orderOut(nil) } }
+enum NativeBridgeError: LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case .message(let text) = self { return text }; return nil }
+}
+
+// Native bundles are loaded by Adobe's scripting API. The utility neither
+// captures screens nor attempts to change another process's windows directly.
+struct InDesignBridge {
+    static let identifier = "com.adobe.InDesign"
+    static let marker = "// Corner Match native startup — managed by Corner Match"
+
+    static func quoteAppleScript(_ value: String) -> String {
+        "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+    static func quoteJavaScript(_ value: String) -> String {
+        String(data: try! JSONEncoder().encode(value), encoding: .utf8)!
+    }
+    static var isRunning: Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: identifier).isEmpty
+    }
+    static func execute(_ javaScript: String) throws -> String {
+        guard isRunning else { throw NativeBridgeError.message("Open InDesign, then press Apply.") }
+        let source = "with timeout of 10 seconds\ntell application id \"\(identifier)\"\ndo script \(quoteAppleScript(javaScript)) language javascript\nend tell\nend timeout"
+        var error: NSDictionary?
+        let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
+        if let error {
+            let number = (error[NSAppleScript.errorNumber] as? NSNumber)?.intValue
+            if number == -1743 {
+                throw NativeBridgeError.message("Allow Corner Match to control InDesign in System Settings → Privacy & Security → Automation, then press Apply.")
+            }
+            throw NativeBridgeError.message(error[NSAppleScript.errorMessage] as? String ?? "InDesign could not run the native extension.")
+        }
+        guard let text = result?.stringValue else { throw NativeBridgeError.message("InDesign did not return a result.") }
+        return text
+    }
+    static func enableScript(bundleURL: URL) -> String {
+        let path = quoteJavaScript(bundleURL.path)
+        return """
+        #targetengine "CornerMatchNative"
+        (function () {
+            var path = \(path);
+            if ($.global.__cornerMatchNative && $.global.__cornerMatchNativePath !== path) {
+                $.global.__cornerMatchNative.cmDisable();
+                $.global.__cornerMatchNative.terminate();
+                $.global.__cornerMatchNative = null;
+            }
+            if (!$.global.__cornerMatchNative) {
+                $.global.__cornerMatchNative = new ExternalObject('lib:' + path);
+                $.global.__cornerMatchNativePath = path;
+            }
+            $.global.__cornerMatchNative.cmEnable();
+            return 'enabled';
+        })();
+        """
+    }
+    static let disableScript = """
+    #targetengine "CornerMatchNative"
+    (function () {
+        if ($.global.__cornerMatchNative) { $.global.__cornerMatchNative.cmDisable(); }
+        return 'disabled';
+    })();
+    """
+    static func startupURL() throws -> URL {
+        let panelPath = try execute("app.scriptPreferences.scriptsFolder.fsName;")
+        let directory = URL(fileURLWithPath: panelPath).deletingLastPathComponent().appendingPathComponent("Startup Scripts", isDirectory: true)
+        let expected = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences/Adobe InDesign", isDirectory: true).path + "/"
+        guard directory.standardizedFileURL.path.hasPrefix(expected) else {
+            throw NativeBridgeError.message("Couldn’t locate InDesign’s per-user startup folder.")
+        }
+        return directory.appendingPathComponent("Corner Match.jsx")
+    }
+    static func installStartup(at url: URL, bundleURL: URL) throws {
+        if FileManager.default.fileExists(atPath: url.path) {
+            let existing = try String(contentsOf: url, encoding: .utf8)
+            guard existing.hasPrefix(marker) else {
+                throw NativeBridgeError.message("A different Corner Match.jsx already exists in InDesign’s startup folder.")
+            }
+        }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Startup failures must not interrupt Adobe's launch with a modal alert.
+        let script = marker + "\n#targetengine \"CornerMatchNative\"\ntry {\n" + enableScript(bundleURL: bundleURL).replacingOccurrences(of: "#targetengine \"CornerMatchNative\"\n", with: "") + "\n} catch (cornerMatchError) { $.writeln('Corner Match: ' + cornerMatchError); }\n"
+        try script.write(to: url, atomically: true, encoding: .utf8)
+    }
+    static func removeStartup(at url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let text = try String(contentsOf: url, encoding: .utf8)
+        guard text.hasPrefix(marker) else { return }
+        try FileManager.default.removeItem(at: url)
+    }
 }
 
 final class Controller: NSObject, ObservableObject {
-    @Published var enabled = false
-    @Published var status = "Ready to test with InDesign."
-    private var timer: Timer?
-    private var tracked: [CGWindowID: TrackedWindow] = [:]
-    private let side: CGFloat = 25
-    private var tickInterval: TimeInterval = 0
-    private var generation = 0
+    @Published private(set) var enabled: Bool
+    @Published private(set) var apps: [TargetApp]
+    @Published var status = "Ready to apply native corners."
+    @Published private(set) var busy = false
+    @Published private(set) var startWithInDesign: Bool
+    private let defaults: UserDefaults
+    private var startupPaths: [String]
 
-    func start() {
-        guard CGPreflightScreenCaptureAccess() else {
-            status = "Allow Screen Recording in System Settings, then reopen Corner Match."
-            CGRequestScreenCaptureAccess(); return
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        enabled = defaults.bool(forKey: "nativeEnabled")
+        startWithInDesign = defaults.object(forKey: "nativeStartWithInDesign") as? Bool ?? true
+        startupPaths = defaults.stringArray(forKey: "nativeStartupScripts") ?? []
+        if let data = defaults.data(forKey: "targetApplications"), let saved = try? JSONDecoder().decode([TargetApp].self, from: data) {
+            apps = saved
+        } else {
+            let id = InDesignBridge.identifier
+            apps = [TargetApp(id: id, name: "Adobe InDesign", path: NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.path, isEnabled: true)]
         }
-        enabled = true
-        status = "Waiting for InDesign."
-        schedule(interval: 0.2)
-        update()
+        super.init()
     }
-    private func schedule(interval: TimeInterval) {
-        guard timer == nil || tickInterval != interval else { return }
-        timer?.invalidate(); tickInterval = interval
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in self?.update() }
-        timer?.tolerance = interval * 0.1
+    func addApplication(at url: URL) {
+        guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !id.isEmpty, id != Bundle.main.bundleIdentifier else { return }
+        if let index = apps.firstIndex(where: { $0.id == id }) {
+            apps[index].path = url.path
+            apps[index].isEnabled = apps[index].supportsNative
+        } else {
+            let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String) ?? url.deletingPathExtension().lastPathComponent
+            apps.append(TargetApp(id: id, name: name, path: url.path, isEnabled: id == InDesignBridge.identifier))
+        }
+        saveApps()
+        if id != InDesignBridge.identifier { status = "Native support is currently available for InDesign. Other apps need their own native adapter." }
+        else if enabled { apply() }
+    }
+    func setApplication(_ id: String, enabled value: Bool) {
+        guard let index = apps.firstIndex(where: { $0.id == id }), apps[index].supportsNative else { return }
+        apps[index].isEnabled = value
+        saveApps()
+        if value { apply() } else { stop() }
+    }
+    func removeApplication(_ id: String) {
+        if id == InDesignBridge.identifier { stop() }
+        apps.removeAll { $0.id == id }
+        saveApps()
+    }
+    private func saveApps() {
+        if let data = try? JSONEncoder().encode(apps) { defaults.set(data, forKey: "targetApplications") }
+    }
+    private func rememberStartup(_ url: URL) {
+        if !startupPaths.contains(url.path) { startupPaths.append(url.path) }
+        defaults.set(startupPaths, forKey: "nativeStartupScripts")
+    }
+    func apply() {
+        guard !busy else { return }
+        guard apps.contains(where: { $0.id == InDesignBridge.identifier && $0.isEnabled }) else {
+            status = "Select InDesign to apply native corners."; return
+        }
+        guard let bundle = Bundle.main.resourceURL?.appendingPathComponent("CornerMatchNative.bundle"), FileManager.default.fileExists(atPath: bundle.path) else {
+            status = "The native extension is missing. Rebuild Corner Match."; return
+        }
+        busy = true
+        defer { busy = false }
+        do {
+            if startWithInDesign {
+                let url = try InDesignBridge.startupURL()
+                try InDesignBridge.installStartup(at: url, bundleURL: bundle)
+                rememberStartup(url)
+            }
+            guard try InDesignBridge.execute(InDesignBridge.enableScript(bundleURL: bundle)) == "enabled" else {
+                throw NativeBridgeError.message("InDesign did not enable the native extension.")
+            }
+            enabled = true
+            defaults.set(true, forKey: "nativeEnabled")
+            status = "Native corners enabled in InDesign. You can quit Corner Match."
+        } catch { status = error.localizedDescription }
     }
     func stop() {
-        generation += 1
-        timer?.invalidate(); timer = nil
-        tracked.values.forEach { $0.hide() }; tracked.removeAll()
-        enabled = false
-        status = "Stopped. InDesign has not been modified."
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            if InDesignBridge.isRunning { _ = try InDesignBridge.execute(InDesignBridge.disableScript) }
+            for path in startupPaths { try InDesignBridge.removeStartup(at: URL(fileURLWithPath: path)) }
+            enabled = false
+            defaults.set(false, forKey: "nativeEnabled")
+            status = "Original corners restored. Startup script removed."
+        } catch { status = error.localizedDescription }
     }
-    func update() {
-        guard enabled else { return }
-        // Fast tracking while dragging, low-frequency geometry checks at rest.
-        let inDesignActive = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.adobe.InDesign"
-        let dragging = inDesignActive && (NSEvent.pressedMouseButtons & 1) != 0
-        schedule(interval: dragging ? 0.025 : (tracked.isEmpty ? 1.0 : 0.2))
-        guard let primary = NSScreen.screens.first,
-              let all = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return }
-        let ids = Set(NSRunningApplication.runningApplications(withBundleIdentifier: "com.adobe.InDesign").map { $0.processIdentifier })
-        let pid = ProcessInfo.processInfo.processIdentifier
-        func bounds(_ d: [String: Any]) -> CGRect? {
-            guard let value = d[kCGWindowBounds as String] as? NSDictionary else { return nil }
-            return CGRect(dictionaryRepresentation: value as CFDictionary)
+    func setStartup(_ value: Bool) {
+        startWithInDesign = value
+        defaults.set(value, forKey: "nativeStartWithInDesign")
+        if value && enabled { apply() }
+        else if !value {
+            do {
+                for path in startupPaths { try InDesignBridge.removeStartup(at: URL(fileURLWithPath: path)) }
+                status = "InDesign won’t load Corner Match automatically next time."
+            } catch { status = error.localizedDescription }
         }
-        let windowIDs = all.compactMap { $0[kCGWindowNumber as String] as? UInt32 }
-        var active = Set<CGWindowID>()
-        for info in all {
-            guard let owner = info[kCGWindowOwnerPID as String] as? Int32, ids.contains(owner),
-                  let layer = info[kCGWindowLayer as String] as? Int, layer == 0,
-                  let number = info[kCGWindowNumber as String] as? UInt32,
-                  let rect = bounds(info), rect.width >= 400, rect.height >= 300 else { continue }
-            let frame = NSRect(x: rect.minX, y: primary.frame.height - rect.maxY, width: rect.width, height: rect.height)
-            if let screen = NSScreen.screens.first(where: { NSIntersectsRect($0.frame, frame) }),
-               rect.width >= screen.frame.width - 1 && rect.height >= screen.frame.height - 1 { continue }
-            active.insert(number)
-            let state: TrackedWindow
-            if let existing = tracked[number] { state = existing }
-            else { state = TrackedWindow(id: number); tracked[number] = state }
-            let moved = state.bounds != rect
-            let parts = [CGRect(x: rect.minX, y: rect.minY, width: side, height: side),
-                         CGRect(x: rect.maxX-side, y: rect.minY, width: side, height: side),
-                         CGRect(x: rect.minX, y: rect.maxY-side, width: side, height: side),
-                         CGRect(x: rect.maxX-side, y: rect.maxY-side, width: side, height: side)]
-            state.bounds = rect
-            let targetIndex = windowIDs.firstIndex(of: number)
-            // Only changes behind the target, near a corner, can change its captured background.
-            let behind = targetIndex.map { Array(all.dropFirst($0 + 1)) } ?? []
-            let scene = behind.compactMap { d -> String? in
-                guard let owner = d[kCGWindowOwnerPID as String] as? Int32, owner != pid,
-                      let id = d[kCGWindowNumber as String] as? UInt32, let r = bounds(d),
-                      parts.contains(where: { $0.intersects(r) }) else { return nil }
-                return "\(id):\(Int(r.minX)),\(Int(r.minY)),\(Int(r.width)),\(Int(r.height))"
-            }.joined(separator: ";")
-            let sceneChanged = scene != state.lastScene
-            state.lastScene = scene
-            let misplaced = state.masks.contains { win in
-                guard win.isVisible, let i = windowIDs.firstIndex(of: CGWindowID(win.windowNumber)), let targetIndex else { return true }
-                return i >= targetIndex
-            }
-            for (index, part) in parts.enumerated() {
-                let mask = state.masks[index]
-                let destination = NSRect(x: part.minX, y: primary.frame.height - part.maxY, width: side, height: side)
-                if mask.frame != destination { mask.setFrame(destination, display: false) }
-                if state.hasImage && (misplaced || !mask.isVisible) { mask.order(.above, relativeTo: Int(number)) }
-            }
-            if !state.captureBusy && (moved || sceneChanged || Date().timeIntervalSince(state.lastCapture) > 2.0) {
-                state.captureBusy = true
-                let token = generation
-                let above = Set(all.prefix((targetIndex ?? 0) + 1).compactMap { $0[kCGWindowNumber as String] as? UInt32 })
-                Task.detached(priority: .utility) { [weak self, weak state] in
-                    var images: [CGImage] = []
-                    do {
-                        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                        for part in parts {
-                            guard let display = content.displays.first(where: { $0.frame.contains(part) }) else { break }
-                            let excludes = content.windows.filter { above.contains($0.windowID) && $0.frame.intersects(part) }
-                            let filter = SCContentFilter(display: display, excludingWindows: excludes)
-                            let config = SCStreamConfiguration()
-                            let scale = CGFloat(CGDisplayPixelsWide(display.displayID)) / display.frame.width
-                            config.width = max(1, Int((part.width * scale).rounded()))
-                            config.height = max(1, Int((part.height * scale).rounded()))
-                            config.sourceRect = part.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
-                            config.showsCursor = false
-                            images.append(try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config))
-                        }
-                    } catch { images.removeAll() }
-                    let capturedImages = images
-                    await MainActor.run { [weak self, weak state] in
-                        guard let self, let state, self.enabled, self.generation == token,
-                              self.tracked[number] === state else { return }
-                        state.captureBusy = false; state.lastCapture = Date()
-                        guard capturedImages.count == 4 else {
-                            state.hasImage = false; state.hide()
-                            self.status = "Couldn’t capture a window corner. Check Screen Recording access and display placement."
-                            return
-                        }
-                        for (index, image) in capturedImages.enumerated() { state.masks[index].maskView.image = image }
-                        state.hasImage = true
-                        for mask in state.masks where !mask.isVisible { mask.order(.above, relativeTo: Int(number)) }
-                    }
-                }
-            }
-        }
-        for (id, state) in tracked where !active.contains(id) { state.hide(); tracked.removeValue(forKey: id) }
-        let nextStatus = active.isEmpty ? "Waiting for an InDesign window." : "Tracking \(active.count) InDesign window\(active.count == 1 ? "" : "s"), even when inactive."
-        if status != nextStatus { status = nextStatus }
     }
-    deinit { timer?.invalidate() }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let model = Controller()
     private var item: NSStatusItem!
     private var window: NSWindow?
-    @Published var loginEnabled = SMAppService.mainApp.status == .enabled
-    @Published var loginMessage = ""
-
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem(); mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        let quitMenuItem = NSMenuItem(title: "Quit Corner Match", action: #selector(quit), keyEquivalent: "q"); quitMenuItem.target = self
+        appMenu.addItem(quitMenuItem); appItem.submenu = appMenu; NSApp.mainMenu = mainMenu
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: "Corner Match")
         let menu = NSMenu()
@@ -209,64 +221,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         menu.addItem(NSMenuItem(title: "Quit Corner Match", action: #selector(quit), keyEquivalent: "q"))
         for entry in menu.items { entry.target = self }
         item.menu = menu
-        let seen = UserDefaults.standard.bool(forKey: "hasOpenedBefore")
-        if !seen || !CGPreflightScreenCaptureAccess() { showWindow() }
-        UserDefaults.standard.set(true, forKey: "hasOpenedBefore")
-        if CGPreflightScreenCaptureAccess() { model.start() }
+        showWindow()
     }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showWindow(); return true
-    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
     @objc func showWindow() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 470, height: 310), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 540), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             w.title = "Corner Match"; w.isReleasedWhenClosed = false
-            w.contentViewController = NSHostingController(rootView: MainView(model: model, app: self))
+            w.collectionBehavior = [.transient, .ignoresCycle]
+            w.contentViewController = NSHostingController(rootView: MainView(model: model))
             w.center(); window = w
         }
-        window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
-    @objc func quit() { model.stop(); NSApp.terminate(nil) }
-    func setLogin(_ value: Bool) {
-        do {
-            if value { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-            loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = loginEnabled == value ? "" : "Check Login Items in System Settings."
-        } catch {
-            loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = "Couldn’t change Login Items: \(error.localizedDescription)"
-        }
-    }
+    // Native changes live inside InDesign and do not depend on this process.
+    @objc func quit() { NSApp.terminate(nil) }
 }
 
 struct MainView: View {
     @ObservedObject var model: Controller
-    @ObservedObject var app: AppDelegate
+    private func chooseApplications() {
+        let panel = NSOpenPanel(); panel.title = "Choose apps"
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.canChooseDirectories = false; panel.canChooseFiles = true; panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { model.addApplication(at: url) }
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Corner Match").font(.system(size: 24, weight: .semibold))
-            Text("InDesign experiment").font(.headline)
-            Text("Round InDesign’s corners while it’s open, including when another app is selected.")
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button(model.enabled ? "Stop" : "Start") { model.enabled ? model.stop() : model.start() }
-                Text(model.status).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Corner Match").font(.system(size: 24, weight: .semibold))
+                Text("Native window corners").foregroundStyle(.secondary)
             }
-            Toggle("Open automatically at login", isOn: Binding(get: { app.loginEnabled }, set: { app.setLogin($0) }))
-            if !app.loginMessage.isEmpty { Text(app.loginMessage).foregroundStyle(.secondary).font(.caption) }
+            Text("Changes the window itself, including its shadow. InDesign keeps the effect when Corner Match is closed.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Apply", action: model.apply).disabled(model.busy)
+                Button("Restore originals", action: model.stop).disabled(model.busy)
+                Spacer()
+            }
+            Text(model.status).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Divider()
-            Text("You can close this window. Corner Match keeps running in the menu bar. Quit it from the menu bar to remove the masks.")
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }.padding(24).frame(width: 470)
+            HStack { Text("Applications").font(.headline); Spacer(); Button("Add apps…", action: chooseApplications) }
+            ScrollView {
+                VStack(spacing: 0) {
+                    if model.apps.isEmpty { Text("Add InDesign to get started.").foregroundStyle(.secondary).padding(12) }
+                    ForEach(model.apps) { target in
+                        HStack(spacing: 10) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: target.path ?? "/Applications")).resizable().frame(width: 28, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(target.name).lineLimit(1)
+                                if !target.supportsNative { Text("Native adapter not available yet").font(.caption).foregroundStyle(.secondary) }
+                            }
+                            Spacer()
+                            Toggle("Enable \(target.name)", isOn: Binding(get: { target.isEnabled && target.supportsNative }, set: { model.setApplication(target.id, enabled: $0) }))
+                                .labelsHidden().disabled(!target.supportsNative || model.busy)
+                            Button { model.removeApplication(target.id) } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Remove \(target.name)")
+                        }.padding(.horizontal, 12).padding(.vertical, 8)
+                        Divider()
+                    }
+                }
+            }.frame(maxHeight: .infinity).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            Toggle("Apply automatically when InDesign opens", isOn: Binding(get: { model.startWithInDesign }, set: model.setStartup))
+            Text("You can quit this utility after applying. Restore originals also removes its InDesign startup script.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.padding(24).frame(width: 490, height: 540)
     }
 }
 @main struct CornerMatch {
     static func main() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.run()
-        withExtendedLifetime(delegate) {}
+        let app = NSApplication.shared; let delegate = AppDelegate(); app.delegate = delegate
+        app.run(); withExtendedLifetime(delegate) {}
     }
 }
