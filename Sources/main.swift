@@ -107,6 +107,7 @@ final class Controller: NSObject, ObservableObject {
     @Published var status = "Ready to apply native corners."
     @Published private(set) var busy = false
     @Published private(set) var startWithInDesign: Bool
+    @Published private(set) var showMenuBarIcon: Bool
     private let defaults: UserDefaults
     private var startupPaths: [String]
 
@@ -114,6 +115,7 @@ final class Controller: NSObject, ObservableObject {
         self.defaults = defaults
         enabled = defaults.bool(forKey: "nativeEnabled")
         startWithInDesign = defaults.object(forKey: "nativeStartWithInDesign") as? Bool ?? true
+        showMenuBarIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true
         startupPaths = defaults.stringArray(forKey: "nativeStartupScripts") ?? []
         if let data = defaults.data(forKey: "targetApplications"), let saved = try? JSONDecoder().decode([TargetApp].self, from: data) {
             apps = saved
@@ -201,11 +203,21 @@ final class Controller: NSObject, ObservableObject {
             } catch { status = error.localizedDescription }
         }
     }
+    func setMenuBarIcon(_ value: Bool) {
+        showMenuBarIcon = value
+        defaults.set(value, forKey: "showMenuBarIcon")
+        NotificationCenter.default.post(name: .cornerMatchMenuBarVisibilityChanged, object: nil)
+        status = value ? "Menu bar icon enabled. macOS menu bar settings may also affect visibility." : "Corner Match is hidden from the menu bar."
+    }
+}
+
+extension Notification.Name {
+    static let cornerMatchMenuBarVisibilityChanged = Notification.Name("CornerMatchMenuBarVisibilityChanged")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let model = Controller()
-    private var item: NSStatusItem!
+    private var item: NSStatusItem?
     private var window: NSWindow?
     func applicationDidFinishLaunching(_ notification: Notification) {
         let mainMenu = NSMenu()
@@ -213,20 +225,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let appMenu = NSMenu()
         let quitMenuItem = NSMenuItem(title: "Quit Corner Match", action: #selector(quit), keyEquivalent: "q"); quitMenuItem.target = self
         appMenu.addItem(quitMenuItem); appItem.submenu = appMenu; NSApp.mainMenu = mainMenu
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: "Corner Match")
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Open Corner Match…", action: #selector(showWindow), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Corner Match", action: #selector(quit), keyEquivalent: "q"))
-        for entry in menu.items { entry.target = self }
-        item.menu = menu
+        NotificationCenter.default.addObserver(self, selector: #selector(updateMenuBarIcon), name: .cornerMatchMenuBarVisibilityChanged, object: nil)
+        updateMenuBarIcon()
         showWindow()
+    }
+    @objc private func updateMenuBarIcon() {
+        if model.showMenuBarIcon {
+            if item == nil {
+                let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                item = statusItem
+                // Give the status item a stable identity across launches.
+                statusItem.autosaveName = NSStatusItem.AutosaveName("CornerMatchMenuBar")
+                statusItem.button?.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: "Corner Match")
+                statusItem.button?.target = self
+                statusItem.button?.action = #selector(showWindow)
+                statusItem.button?.toolTip = "Open Corner Match"
+                statusItem.button?.imagePosition = .imageOnly
+            }
+            // Request visibility; macOS may also control whether the item appears.
+            item?.isVisible = true
+        } else if let item {
+            NSStatusBar.system.removeStatusItem(item)
+            self.item = nil
+        }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
     @objc func showWindow() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 540), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 580), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             w.title = "Corner Match"; w.isReleasedWhenClosed = false
             w.collectionBehavior = [.transient, .ignoresCycle]
             w.contentViewController = NSHostingController(rootView: MainView(model: model))
@@ -285,9 +311,10 @@ struct MainView: View {
                 }
             }.frame(maxHeight: .infinity).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
             Toggle("Apply automatically when InDesign opens", isOn: Binding(get: { model.startWithInDesign }, set: model.setStartup))
+            Toggle("Show Corner Match in the menu bar", isOn: Binding(get: { model.showMenuBarIcon }, set: model.setMenuBarIcon))
             Text("You can quit this utility after applying. Restore originals also removes its InDesign startup script.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }.padding(24).frame(width: 490, height: 540)
+        }.padding(24).frame(width: 490, height: 580)
     }
 }
 @main struct CornerMatch {
