@@ -2,7 +2,7 @@
 
 A small native macOS menu bar app for keeping your current focus in view.
 
-Click the text in the menu bar and choose **Rename…** to change it. Your text is saved between launches. Choose **Quit FocusBar** to quit. Leaving the field blank resets the text to “Focus”.
+Click the menu bar item to edit your focus beneath the menu bar. Press Return or click away to save. Your text can be up to 30 characters and is saved between launches. When the field is blank, only ✦ appears. Right-click the item and choose **Quit FocusBar** to quit.
 
 ## Build and run
 
