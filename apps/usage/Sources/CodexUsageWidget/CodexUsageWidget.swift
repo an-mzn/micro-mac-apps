@@ -230,11 +230,10 @@ private struct UsageWidgetView: View {
                         .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 if let reset = allowance.reset {
-                    HStack(spacing: 2) {
-                        Image(systemName: "arrow.clockwise").font(.system(size: 7, weight: .medium))
-                        Text(resetTimeLeft(reset)).lineLimit(1).minimumScaleFactor(0.75)
-                    }
-                    .font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text(resetTimeLeft(reset))
+                        .lineLimit(1).minimumScaleFactor(0.75)
+                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
                 }
             }
         } else {
@@ -304,8 +303,8 @@ private struct SplitAllowanceRing: View {
             if fiveHour == nil, let weekly {
                 segment(weekly, from: 180, to: -180)
             } else {
-                segment(fiveHour, from: 218, to: 322)
-                segment(weekly, from: 200, to: -20)
+                segment(fiveHour, from: 221, to: 319)
+                segment(weekly, from: 197, to: -17)
             }
             RoundedRectangle(cornerRadius: size * 0.04)
                 .fill(.tertiary)
