@@ -64,6 +64,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func accountSortValue(_ profile: Profile) -> (primary: Double, secondary: Double) {
+        // Purchased-credit balances are separate from the included rate-limit windows.
         let windows = profile.snapshot?.windows.filter { $0.minutes == 300 || $0.minutes == 10_080 } ?? []
         if config.accountSortOrder == "nextReset" {
             let nextReset = windows.compactMap(\.reset).filter { $0 > Date() }.min()?.timeIntervalSince1970 ?? .greatestFiniteMagnitude
@@ -939,7 +940,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let row = AccountDropRow(profileID: profile.id) { [weak self] source, destination in
                 self?.moveProfile(source, to: destination)
             }
-            let handle = AccountDragHandle(profileID: profile.id)
+            let handle = AccountDragHandle(profileID: profile.id, row: row)
             handle.isHidden = config.automaticAccountSorting == true
             let content = NSStackView(views: [handle, details])
             content.orientation = .horizontal
@@ -1106,10 +1107,12 @@ private extension NSPasteboard.PasteboardType {
 
 private final class AccountDragHandle: NSView, NSDraggingSource {
     private let profileID: UUID
+    private weak var row: AccountDropRow?
     private let glyph = NSImageView()
 
-    init(profileID: UUID) {
+    init(profileID: UUID, row: AccountDropRow) {
         self.profileID = profileID
+        self.row = row
         super.init(frame: .zero)
         let image = NSImage(systemSymbolName: "line.3.horizontal", accessibilityDescription: "Reorder account")
         glyph.image = image
@@ -1139,8 +1142,18 @@ private final class AccountDragHandle: NSView, NSDraggingSource {
         let item = NSPasteboardItem()
         item.setString(profileID.uuidString, forType: .usageAccountID)
         let draggingItem = NSDraggingItem(pasteboardWriter: item)
-        let image = glyph.image ?? NSImage(size: NSSize(width: 14, height: 14))
-        draggingItem.setDraggingFrame(bounds, contents: image)
+        let image: NSImage
+        let frame: NSRect
+        if let row, let bitmap = row.bitmapImageRepForCachingDisplay(in: row.bounds) {
+            row.cacheDisplay(in: row.bounds, to: bitmap)
+            image = NSImage(size: row.bounds.size)
+            image.addRepresentation(bitmap)
+            frame = row.convert(row.bounds, to: self)
+        } else {
+            image = glyph.image ?? NSImage(size: NSSize(width: 14, height: 14))
+            frame = bounds
+        }
+        draggingItem.setDraggingFrame(frame, contents: image)
         beginDraggingSession(with: [draggingItem], event: event, source: self)
     }
 
