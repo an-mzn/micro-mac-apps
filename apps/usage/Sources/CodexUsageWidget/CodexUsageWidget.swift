@@ -125,7 +125,7 @@ private struct UsageWidgetView: View {
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .lineLimit(1).minimumScaleFactor(0.75)
                                 .frame(width: 55, alignment: .leading)
-                            SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 32, lineWidth: 4)
+                            SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 32)
                             compactAllowance(account.fiveHour, title: "5h")
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             compactAllowance(account.weekly, title: "Wk")
@@ -265,30 +265,14 @@ private struct SplitAllowanceRing: View {
     let fiveHour: Allowance?
     let weekly: Allowance?
     let size: CGFloat
-    var lineWidth: CGFloat = 5
-
     var body: some View {
         ZStack {
-            allowanceArc(from: 180, to: 360).stroke(.quaternary,
-                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            allowanceArc(from: 0, to: 180).stroke(.quaternary,
-                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            if let fiveHour {
-                allowanceArc(from: 180, to: 180 + 180 * progress(fiveHour.remaining))
-                    .stroke(allowanceColor(fiveHour.remaining), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            }
-            if let weekly {
-                allowanceArc(from: 0, to: 180 * progress(weekly.remaining))
-                    .stroke(allowanceColor(weekly.remaining), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            }
-            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                .font(.system(size: max(9, size * 0.2), weight: .semibold)).foregroundStyle(.secondary)
-            Image(systemName: "clock")
-                .font(.system(size: max(6, size * 0.14), weight: .medium)).foregroundStyle(.secondary)
-                .offset(y: -size * 0.22)
-            Image(systemName: "calendar")
-                .font(.system(size: max(6, size * 0.13), weight: .medium)).foregroundStyle(.secondary)
-                .offset(y: size * 0.22)
+            segment(fiveHour, from: 198, to: 342)
+            segment(weekly, from: 18, to: 162)
+            RoundedRectangle(cornerRadius: size * 0.04)
+                .fill(.tertiary)
+                .frame(width: size * 0.24, height: size * 0.24)
+                .rotationEffect(.degrees(45))
         }
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
@@ -301,18 +285,15 @@ private struct SplitAllowanceRing: View {
         return "\(five), \(week)"
     }
 
-    private func progress(_ remaining: Int) -> Double {
-        Double(min(100, max(0, remaining))) / 100
-    }
-
-    private func allowanceColor(_ remaining: Int) -> Color {
-        if remaining <= 15 { return .orange }
-        if remaining <= 35 { return .yellow }
-        return .green
-    }
-
-    private func allowanceArc(from start: Double, to end: Double) -> RingArc {
-        RingArc(start: start, end: end)
+    private func segment(_ allowance: Allowance?, from start: Double, to end: Double) -> some View {
+        let style = StrokeStyle(lineWidth: size * 0.065, lineCap: .round)
+        let track = RingArc(start: start, end: end)
+        let fraction = Double(allowance?.remaining ?? 0) / 100
+        return track.stroke(.quaternary, style: style)
+            .overlay {
+                RingArc(start: start, end: start + (end - start) * fraction)
+                    .stroke(.secondary, style: style)
+            }
     }
 }
 
@@ -326,7 +307,7 @@ private struct RingArc: Shape {
         var path = Path()
         guard radius > 0, end > start else { return path }
         path.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: radius,
-                    startAngle: .degrees(start), endAngle: .degrees(end), clockwise: true)
+                    startAngle: .degrees(start), endAngle: .degrees(end), clockwise: false)
         return path
     }
 }
