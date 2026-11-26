@@ -45,8 +45,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { config = try storage.load() }
         catch { storageProblem = true; loadFailed = true }
-        item.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent",
-                                     accessibilityDescription: "Codex Usage")
+        let icon = Bundle.main.url(forResource: "codex-refresh", withExtension: "png")
+            .flatMap { NSImage(contentsOf: $0) }
+        icon?.size = NSSize(width: 20, height: 20)
+        item.button?.image = icon
             ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Codex Usage")
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeading

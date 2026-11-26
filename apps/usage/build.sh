@@ -8,9 +8,11 @@ mkdir -p "$out"
 staging="$(mktemp -d "$out/.codex-usage.XXXXXX")"
 trap 'rm -rf "$staging"' EXIT
 app="$staging/Codex Usage.app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp Info.plist "$app/Contents/Info.plist"
 install -m 755 "$bin_dir/CodexUsage" "$app/Contents/MacOS/CodexUsage"
+sips -s format png -z 80 80 Assets/codex-refresh.svg \
+    --out "$app/Contents/Resources/codex-refresh.png" >/dev/null
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"
 ditto -c -k --norsrc --noextattr --noqtn --keepParent "$app" "$staging/Codex Usage.zip"
