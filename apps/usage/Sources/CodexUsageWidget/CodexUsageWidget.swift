@@ -200,7 +200,9 @@ private struct UsageWidgetView: View {
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .lineLimit(1).minimumScaleFactor(0.75)
                                 .frame(width: 58, alignment: .leading)
-                            allowanceColumn(account.fiveHour, title: "5 hours")
+                            if let fiveHour = account.fiveHour {
+                                allowanceColumn(fiveHour, title: "5 hours")
+                            }
                             allowanceColumn(account.weekly, title: "Weekly")
                         }
                         .frame(height: 76)
