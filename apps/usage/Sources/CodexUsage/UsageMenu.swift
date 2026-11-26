@@ -313,8 +313,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let current = candidates.first { $0.minutes == 300 } ?? candidates.first { $0.minutes == 10_080 }
         let weekly = candidates.first { $0.minutes == 10_080 }
         var values = [String]()
-        if let current { values.append("\(current.minutes == 300 ? "5h" : "Wk") \(current.remaining)%") }
-        if let weekly, current?.id != weekly.id { values.append("Wk \(weekly.remaining)%") }
+        if let current { values.append("\(current.minutes == 300 ? "5h" : "Wk") · \(current.remaining) credits") }
+        if let weekly, current?.id != weekly.id { values.append("Wk · \(weekly.remaining) credits") }
         return values.joined(separator: " · ")
     }
 
