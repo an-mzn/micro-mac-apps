@@ -842,9 +842,22 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         window.delegate = self
         settingsWindow = window
         settingsTabs = tabs
+        installApplicationMenu()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func installApplicationMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem(title: "Usage", action: nil, keyEquivalent: "")
+        let appMenu = NSMenu(title: "Usage")
+        let quitItem = NSMenuItem(title: "Quit Usage", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        appMenu.addItem(quitItem)
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+        NSApp.mainMenu = mainMenu
     }
 
     private func fieldRow(_ title: String, _ control: NSView) -> NSView {
