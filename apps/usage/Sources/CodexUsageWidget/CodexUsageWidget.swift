@@ -112,29 +112,29 @@ private struct UsageWidgetView: View {
                 Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
-        }.padding(14)
+        }.padding(.horizontal, 14).padding(.vertical, 16)
     }
     private var medium: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
             if !entry.accounts.isEmpty {
-                VStack(spacing: 4) {
+                HStack(alignment: .top, spacing: 10) {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
-                        HStack(spacing: 7) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text(account.label)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .lineLimit(1).minimumScaleFactor(0.75)
-                                .frame(width: 55, alignment: .leading)
-                            SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 32)
-                            compactAllowance(account.fiveHour, title: "5h")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            compactAllowance(account.weekly, title: "Wk")
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                            HStack(spacing: 5) {
+                                SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 30)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    if account.fiveHour != nil {
+                                        compactAllowance(account.fiveHour, title: "5h")
+                                    }
+                                    compactAllowance(account.weekly, title: "Wk")
+                                }
+                            }
                         }
-                        .frame(height: 30)
-                        if account.id != entry.accounts.prefix(3).last?.id {
-                            Rectangle().fill(.quaternary).frame(height: 1)
-                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
                 Spacer(minLength: 0)
@@ -144,7 +144,7 @@ private struct UsageWidgetView: View {
                 Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
-        }.padding(12)
+        }.padding(.horizontal, 12).padding(.vertical, 15)
     }
     private var large: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -267,8 +267,12 @@ private struct SplitAllowanceRing: View {
     let size: CGFloat
     var body: some View {
         ZStack {
-            segment(fiveHour, from: 198, to: 342)
-            segment(weekly, from: 18, to: 162)
+            if fiveHour == nil, let weekly {
+                segment(weekly, from: 180, to: -180)
+            } else {
+                segment(fiveHour, from: 218, to: 322)
+                segment(weekly, from: 200, to: -20)
+            }
             RoundedRectangle(cornerRadius: size * 0.04)
                 .fill(.tertiary)
                 .frame(width: size * 0.24, height: size * 0.24)
@@ -305,9 +309,13 @@ private struct RingArc: Shape {
         let inset = rect.width * 0.08
         let radius = min(rect.width, rect.height) / 2 - inset
         var path = Path()
-        guard radius > 0, end > start else { return path }
+        guard radius > 0, end != start else { return path }
+        if abs(end - start) == 360 {
+            return Path(ellipseIn: CGRect(x: rect.midX - radius, y: rect.midY - radius,
+                                          width: 2 * radius, height: 2 * radius))
+        }
         path.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: radius,
-                    startAngle: .degrees(start), endAngle: .degrees(end), clockwise: false)
+                    startAngle: .degrees(start), endAngle: .degrees(end), clockwise: end < start)
         return path
     }
 }
