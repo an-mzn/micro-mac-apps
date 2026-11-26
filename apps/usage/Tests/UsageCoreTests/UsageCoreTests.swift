@@ -20,6 +20,24 @@ final class UsageCoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: storage.root)
     }
 
+    func testMostAvailableUsesWeeklyOnlyWhenFiveHourWindowIsAbsent() {
+        let identity = Identity(account: Account(type: "chatgpt", email: nil, planType: nil, workspaceName: nil),
+                                workspaceID: nil)
+        let fiveHours = Window(id: "codex:Primary", bucket: "Codex", slot: "Primary", minutes: 300, used: 60, reset: nil)
+        let weekly = Window(id: "codex:Secondary", bucket: "Codex", slot: "Secondary", minutes: 10_080, used: 0, reset: nil)
+        let weeklyOnly = Window(id: "codex:Primary", bucket: "Codex", slot: "Primary", minutes: 10_080, used: 30, reset: nil)
+        let pairedProfile = Profile(id: UUID(), label: "Both", identity: identity,
+                                    snapshot: Snapshot(windows: [fiveHours, weekly]))
+        let weeklyProfile = Profile(id: UUID(), label: "Weekly only", identity: identity,
+                                     snapshot: Snapshot(windows: [weeklyOnly]))
+        var config = Configuration()
+        config.profiles = [pairedProfile, weeklyProfile]
+        XCTAssertEqual(config.mostAvailable?.profile.id, weeklyProfile.id)
+        XCTAssertEqual(config.mostAvailable?.window.remaining, 70)
+        config.profiles = [pairedProfile]
+        XCTAssertEqual(config.mostAvailable?.window.remaining, 40)
+    }
+
     private func profile(_ scenario: String) throws -> (UUID, URL) {
         let id = UUID()
         let home = try storage.home(id)

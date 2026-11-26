@@ -172,17 +172,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateIcon() {
-        let profile = config.profiles.first { $0.id == config.menuProfile }
+        let mostAvailable = config.menuShowsMostAvailable == true ? config.mostAvailable : nil
+        let profile = mostAvailable?.profile ?? config.profiles.first { $0.id == config.menuProfile }
         let windows = profile?.snapshot?.windows ?? []
         let showsBoth = config.menuWeeklyWindow != nil
-        let window = windows.first { $0.id == config.menuWindow && (!showsBoth || $0.minutes == 300) }
+        let window = mostAvailable?.window ?? windows.first { $0.id == config.menuWindow && (!showsBoth || $0.minutes == 300) }
         let week = windows.first { $0.id == config.menuWeeklyWindow && $0.minutes == 10_080 }
-        let values = [window, week].compactMap { $0 }.map { "\($0.remaining)%" }
+        var values = [window, week].compactMap { $0 }.map { "\($0.remaining)%" }
+        if let mostAvailable { values.insert(mostAvailable.profile.label, at: 0) }
         let stale = profile.map { p in
             p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
         } ?? false
         item.button?.title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
-        let details = [window, week].compactMap { $0 }.map { "\($0.title) · \($0.remaining)% left" }
+        var details = [window, week].compactMap { $0 }.map { "\($0.title) · \($0.remaining)% left" }
+        if let mostAvailable { details.insert(mostAvailable.profile.label, at: 0) }
         item.button?.toolTip = details.isEmpty ? "Codex Usage" :
             details.joined(separator: " | ") + (stale ? " · stale" : "")
         item.button?.setAccessibilityLabel(item.button?.toolTip ?? "Codex Usage")
@@ -544,6 +547,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let selection = NSPopUpButton()
         selection.setAccessibilityLabel("Menu bar allowance")
         selection.addItem(withTitle: "Icon only")
+        selection.addItem(withTitle: "Most allowance available")
+        let profileOptionsStart = selection.numberOfItems
         var options: [(profile: UUID, window: String, week: String?)] = []
         func addOption(_ title: String, profile: UUID, window: String, week: String? = nil) {
             options.append((profile, window, week))
@@ -561,16 +566,18 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 addOption("\(profile.label) · \(window.title)", profile: profile.id, window: window.id)
             }
         }
-        if let profileID = config.menuProfile, let windowID = config.menuWindow,
+        if config.menuShowsMostAvailable == true {
+            selection.selectItem(at: 1)
+        } else if let profileID = config.menuProfile, let windowID = config.menuWindow,
            let profile = config.profiles.first(where: { $0.id == profileID }) {
             if let index = options.firstIndex(where: {
                 $0.profile == profileID && $0.window == windowID && $0.week == config.menuWeeklyWindow
             }) {
-                selection.selectItem(at: index + 1)
+                selection.selectItem(at: index + profileOptionsStart)
             } else {
                 addOption("\(profile.label) · Saved display (reading unavailable)",
                           profile: profileID, window: windowID, week: config.menuWeeklyWindow)
-                selection.selectItem(at: options.count)
+                selection.selectItem(at: selection.numberOfItems - 1)
             }
         }
         let loginBefore = SMAppService.mainApp.status
@@ -599,7 +606,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             alert("CLI unavailable", "Choose an absolute path to an executable Codex binary.")
             return
         }
-        let index = selection.indexOfSelectedItem - 1
+        let index = selection.indexOfSelectedItem - profileOptionsStart
         let option = options.indices.contains(index) ? options[index] : nil
         change {
             $0.minutes = choices[max(0, interval.indexOfSelectedItem)]
@@ -607,6 +614,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             $0.menuProfile = option?.profile
             $0.menuWindow = option?.window
             $0.menuWeeklyWindow = option?.week
+            $0.menuShowsMostAvailable = selection.indexOfSelectedItem == 1
         }
         do {
             let wasOn = loginBefore == .enabled || loginBefore == .requiresApproval

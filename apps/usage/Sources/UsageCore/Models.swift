@@ -131,7 +131,18 @@ public struct Configuration: Codable, Equatable {
     public var menuProfile: UUID?
     public var menuWindow: String?
     public var menuWeeklyWindow: String?
+    public var menuShowsMostAvailable: Bool?
     public init() {}
+
+    public var mostAvailable: (profile: Profile, window: Window)? {
+        profiles.compactMap { profile -> (profile: Profile, window: Window)? in
+            let windows = (profile.snapshot?.windows ?? []).filter { $0.minutes == 300 || $0.minutes == 10_080 }
+            let primary = windows.filter { $0.bucketID == "codex" }
+            let candidates = primary.isEmpty ? windows : primary
+            let window = candidates.first { $0.minutes == 300 } ?? candidates.first { $0.minutes == 10_080 }
+            return window.map { (profile, $0) }
+        }.max { $0.window.remaining < $1.window.remaining }
+    }
 }
 
 public enum UsageError: LocalizedError, Equatable {

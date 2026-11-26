@@ -16,7 +16,7 @@ The app checks for the CLI bundled in ChatGPT, then checks absolute PATH entries
 
 Cached readings appear immediately. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile.
 
-Use **Refresh All** or the account submenu’s **Refresh Account** for an immediate read. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
+Use **Refresh All** or the account submenu’s **Refresh Account** for an immediate read. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. **Most allowance available** shows the account with the highest remaining percentage, comparing each account’s 5-hour reading or its weekly reading if the 5-hour window is absent. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
 
 ## Profile storage and removal
 
@@ -33,7 +33,7 @@ swift test -c release
 ./build.sh
 ```
 
-Seven Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
+Eight Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, automatic 5-hour and weekly comparison, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
 
 The packaged Release build was exercised in the actual macOS menu bar. The three-profile fixture displayed account context, reset times, low allowance, loading, offline, timeout, stale data, and an independently successful account. Removing a profile while its refresh was blocked reaped its child and left the other two profiles in the menu. The installed CLI also returned a genuine device challenge from a clean tracker home and accepted cancellation. The packaged app displayed that challenge and reaped the child after the menu’s Cancel Sign-In action.
 
