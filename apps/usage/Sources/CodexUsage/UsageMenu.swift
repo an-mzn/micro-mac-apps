@@ -211,7 +211,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     func menuWillOpen(_ menu: NSMenu) {
         menuIsOpen = true
-        DispatchQueue.main.async { [weak self] in self?.beginRefreshBatch(manual: true) }
+        DispatchQueue.main.async { [weak self] in self?.beginRefreshBatch(maxAge: 120) }
     }
 
     func menuDidClose(_ menu: NSMenu) { menuIsOpen = false }
@@ -448,13 +448,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         defer { updateIcon(); schedule() }
         guard !asleep, !quitPending, !ProcessInfo.processInfo.isLowPowerModeEnabled,
               Date() >= grace, cli != nil else { return }
-        let now = Date()
-        let hasDueAccount = config.profiles.contains { profile in
-            guard jobs[profile.id] == nil else { return false }
-            if let failure = failures[profile.id] { return failure.retry <= now }
-            return profile.snapshot?.due(interval: interval, now: now) != false
-        }
-        if hasDueAccount { beginRefreshBatch() }
+        beginRefreshBatch()
     }
 
     private func start<T>(_ id: UUID, _ job: Job, perform: @escaping () throws -> T,
@@ -521,13 +515,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         beginRefreshBatch(manual: true)
     }
 
-    private func beginRefreshBatch(manual: Bool = false) {
+    private func beginRefreshBatch(manual: Bool = false, maxAge: TimeInterval? = nil) {
         guard refreshBatch.isEmpty, !quitPending, cli != nil else { return }
         let now = Date()
         let accounts = config.profiles.filter { profile in
             guard jobs[profile.id] == nil, afterJob[profile.id] == nil else { return false }
-            return manual || failures[profile.id].map { $0.retry <= now } != false
+            if manual { return true }
+            if let failure = failures[profile.id] { return failure.retry <= now }
+            return profile.snapshot?.due(interval: maxAge ?? interval, now: now) != false
         }
+        guard !accounts.isEmpty else { return }
         refreshBatch = Set(accounts.map(\.id))
         batchUpdated = false
         if menuIsOpen { menu.update() }
