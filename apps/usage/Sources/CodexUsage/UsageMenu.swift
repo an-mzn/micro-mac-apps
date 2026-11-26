@@ -884,12 +884,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             column.orientation = .vertical
             column.alignment = .leading
             column.spacing = 3
-            let orderUp = profileOrderButton("↑", id: profile.id, delta: -1)
-            orderUp.isEnabled = config.profiles.first?.id != profile.id
-            let orderDown = profileOrderButton("↓", id: profile.id, delta: 1)
-            orderDown.isEnabled = config.profiles.last?.id != profile.id
             let actions = NSStackView(views: [
-                orderUp, orderDown,
                 profileButton("Rename…", selector: #selector(renameProfileButton(_:)), id: profile.id),
                 profileButton("Details…", selector: #selector(accountDetailsForButton(_:)), id: profile.id),
                 profileButton("Reauthenticate…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id),
@@ -898,11 +893,27 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             actions.orientation = .horizontal
             actions.alignment = .centerY
             actions.spacing = 8
-            let card = NSStackView(views: [column, actions])
-            card.orientation = .vertical
-            card.alignment = .leading
-            card.spacing = 8
-            return card
+            let details = NSStackView(views: [column, actions])
+            details.orientation = .vertical
+            details.alignment = .leading
+            details.spacing = 8
+            let row = AccountDropRow(profileID: profile.id) { [weak self] source, destination in
+                self?.moveProfile(source, to: destination)
+            }
+            let handle = AccountDragHandle(profileID: profile.id)
+            let content = NSStackView(views: [handle, details])
+            content.orientation = .horizontal
+            content.alignment = .centerY
+            content.spacing = 10
+            content.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(content)
+            NSLayoutConstraint.activate([
+                content.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+                content.topAnchor.constraint(equalTo: row.topAnchor),
+                content.bottomAnchor.constraint(equalTo: row.bottomAnchor)
+            ])
+            return row
         }
         var content: [NSView] = [intro, refresh, addAccount, details]
         if !rows.isEmpty {
@@ -918,19 +929,15 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         content.forEach { stack.addArrangedSubview($0) }
     }
 
-    private func profileOrderButton(_ title: String, id: UUID, delta: Int) -> NSButton {
-        let button = profileButton(title, selector: #selector(moveProfile(_:)), id: id)
-        button.tag = delta
-        button.setAccessibilityLabel(delta < 0 ? "Move account up" : "Move account down")
-        return button
-    }
-
-    @objc private func moveProfile(_ sender: NSButton) {
-        guard let id = sender.cell?.representedObject as? UUID,
-              let index = config.profiles.firstIndex(where: { $0.id == id }) else { return }
-        let destination = index + sender.tag
-        guard config.profiles.indices.contains(destination) else { return }
-        change { $0.profiles.swapAt(index, destination) }
+    private func moveProfile(_ source: UUID, to destination: UUID) {
+        guard let sourceIndex = config.profiles.firstIndex(where: { $0.id == source }),
+              let destinationIndex = config.profiles.firstIndex(where: { $0.id == destination }),
+              sourceIndex != destinationIndex else { return }
+        change { profiles in
+            let moving = profiles.profiles.remove(at: sourceIndex)
+            let adjustedDestination = destinationIndex > sourceIndex ? destinationIndex - 1 : destinationIndex
+            profiles.profiles.insert(moving, at: adjustedDestination)
+        }
     }
 
     @objc private func changeResetDisplay(_ sender: NSButton) {
@@ -1040,4 +1047,79 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
+}
+
+private extension NSPasteboard.PasteboardType {
+    static let usageAccountID = NSPasteboard.PasteboardType("com.an-mzn.usage.account-id")
+}
+
+private final class AccountDragHandle: NSView, NSDraggingSource {
+    private let profileID: UUID
+    private let glyph = NSImageView()
+
+    init(profileID: UUID) {
+        self.profileID = profileID
+        super.init(frame: .zero)
+        let image = NSImage(systemSymbolName: "line.3.horizontal", accessibilityDescription: "Reorder account")
+        glyph.image = image
+        glyph.contentTintColor = .secondaryLabelColor
+        glyph.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(glyph)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 24),
+            heightAnchor.constraint(equalToConstant: 34),
+            glyph.centerXAnchor.constraint(equalTo: centerXAnchor),
+            glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
+            glyph.widthAnchor.constraint(equalToConstant: 14),
+            glyph.heightAnchor.constraint(equalToConstant: 14)
+        ])
+        toolTip = "Drag to reorder account"
+        setAccessibilityLabel("Drag to reorder account")
+        setAccessibilityRole(.button)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .openHand)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let item = NSPasteboardItem()
+        item.setString(profileID.uuidString, forType: .usageAccountID)
+        let draggingItem = NSDraggingItem(pasteboardWriter: item)
+        let image = glyph.image ?? NSImage(size: NSSize(width: 14, height: 14))
+        draggingItem.setDraggingFrame(bounds, contents: image)
+        beginDraggingSession(with: [draggingItem], event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
+}
+
+private final class AccountDropRow: NSView {
+    private let profileID: UUID
+    private let reorder: (UUID, UUID) -> Void
+
+    init(profileID: UUID, reorder: @escaping (UUID, UUID) -> Void) {
+        self.profileID = profileID
+        self.reorder = reorder
+        super.init(frame: .zero)
+        registerForDraggedTypes([.usageAccountID])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard sender.draggingPasteboard.string(forType: .usageAccountID).flatMap(UUID.init(uuidString:)) != profileID else { return [] }
+        return .move
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { draggingEntered(sender) }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let value = sender.draggingPasteboard.string(forType: .usageAccountID),
+              let source = UUID(uuidString: value), source != profileID else { return false }
+        reorder(source, profileID)
+        return true
+    }
 }
