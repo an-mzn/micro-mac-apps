@@ -7,6 +7,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private let appGroup = "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
     private var config = Configuration()
+    private var widgetReloadPending = false
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
     private var menuIsOpen = false
@@ -30,6 +31,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let text: String
         let count: Int
         let retry: Date
+    }
+    private struct WidgetAllowanceState: Equatable {
+        let remaining: Int?
+        let reset: Date?
+    }
+    private struct WidgetProfileState: Equatable {
+        let id: UUID
+        let label: String
+        let fiveHour: WidgetAllowanceState
+        let weekly: WidgetAllowanceState
     }
     private var jobs: [UUID: Job] = [:]
     private var refreshBatch: Set<UUID> = []
@@ -95,7 +106,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { config = try storage.load() }
         catch { storageProblem = true; loadFailed = true }
-        WidgetCenter.shared.reloadAllTimelines()
+        let widgetVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        let versionKey = "widgetTimelineBundleVersion"
+        if let widgetVersion, UserDefaults.standard.string(forKey: versionKey) != widgetVersion {
+            reloadUsageWidget()
+            UserDefaults.standard.set(widgetVersion, forKey: versionKey)
+        }
         let icon = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
         icon?.size = NSSize(width: 18, height: 18)
@@ -361,13 +377,38 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     private func commit(_ next: Configuration) throws {
         guard !loadFailed else { throw UsageError.rejected }
+        let widgetDataChanged = widgetProfileStates(config) != widgetProfileStates(next)
         try storage.save(next)
         config = next
         storageProblem = false
         rebuildAccountSettingsPage()
-        WidgetCenter.shared.reloadAllTimelines()
+        if widgetDataChanged {
+            if refreshBatch.isEmpty {
+                reloadUsageWidget()
+            } else {
+                widgetReloadPending = true
+            }
+        }
         updateIcon()
         if menuIsOpen { menu.update() }
+    }
+
+    private func reloadUsageWidget() {
+        WidgetCenter.shared.reloadTimelines(ofKind: "CodexUsageWidget")
+    }
+
+    private func widgetProfileStates(_ configuration: Configuration) -> [WidgetProfileState] {
+        configuration.profiles.map { profile in
+            let windows = profile.snapshot?.windows ?? []
+            let fiveHour = windows.first { $0.minutes == 300 }
+            let weekly = windows.first { $0.minutes == 10_080 }
+            return WidgetProfileState(
+                id: profile.id,
+                label: profile.label,
+                fiveHour: WidgetAllowanceState(remaining: fiveHour?.remaining, reset: fiveHour?.reset),
+                weekly: WidgetAllowanceState(remaining: weekly?.remaining, reset: weekly?.reset)
+            )
+        }
     }
 
     private func change(_ edit: (inout Configuration) -> Void) {
@@ -433,8 +474,13 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private func finish<T>(_ id: UUID, work: Work, _ result: Result<T, Error>, complete: (Result<T, Error>) -> Void) {
         let next = afterJob.removeValue(forKey: id)
         if work != .refresh || (next == nil && !quitPending) { complete(result) }
-        if work == .refresh, refreshBatch.remove(id) != nil, refreshBatch.isEmpty, batchUpdated, !quitPending {
-            change { $0.lastRefreshed = Date() }
+        if work == .refresh, refreshBatch.remove(id) != nil, refreshBatch.isEmpty {
+            if batchUpdated && !quitPending { change { $0.lastRefreshed = Date() } }
+            if widgetReloadPending && !quitPending {
+                reloadUsageWidget()
+                widgetReloadPending = false
+            }
+            batchUpdated = false
         }
         if !quitPending { next?() }
         if quitPending && jobs.isEmpty { NSApp.reply(toApplicationShouldTerminate: true) }

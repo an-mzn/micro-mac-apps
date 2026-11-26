@@ -53,7 +53,7 @@ private struct UsageProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void) { completion(read()) }
     func getTimeline(in context: Context, completion: @escaping (Timeline<UsageEntry>) -> Void) {
         let entry = read()
-        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(900))))
+        completion(Timeline(entries: [entry], policy: .never))
     }
     private func read() -> UsageEntry {
         guard let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
