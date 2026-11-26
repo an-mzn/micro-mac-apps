@@ -164,12 +164,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let showsBoth = config.menuWeeklyWindow != nil
         let window = windows.first { $0.id == config.menuWindow && (!showsBoth || $0.minutes == 300) }
         let week = windows.first { $0.id == config.menuWeeklyWindow && $0.minutes == 10_080 }
-        let values: [String]
-        if showsBoth {
-            values = [window.map { "5h \($0.remaining)%" }, week.map { "Wk \($0.remaining)%" }].compactMap { $0 }
-        } else {
-            values = window.map { ["\($0.remaining)%"] } ?? []
-        }
+        let values = [window, week].compactMap { $0 }.map { "\($0.remaining)%" }
         let stale = profile.map { p in
             p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
         } ?? false
