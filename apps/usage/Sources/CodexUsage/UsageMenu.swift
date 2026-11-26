@@ -13,6 +13,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private var settingsWindow: NSWindow?
     private weak var settingsTabs: NSTabViewController?
     private weak var accountSettingsStack: NSStackView?
+    private weak var accountSortControl: NSPopUpButton?
     private let queue: OperationQueue = {
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 2
@@ -50,6 +51,29 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private var powerObserver: NSObjectProtocol?
     private var interval: TimeInterval { Double(min(120, max(5, config.minutes))) * 60 }
     private var cli: URL? { Client.executable(override: config.binary) }
+    private var orderedProfiles: [Profile] {
+        guard config.automaticAccountSorting == true else { return config.profiles }
+        let indexed = Array(config.profiles.enumerated())
+        return indexed.sorted { left, right in
+            let leftScore = accountSortValue(left.element)
+            let rightScore = accountSortValue(right.element)
+            if leftScore.primary != rightScore.primary { return leftScore.primary < rightScore.primary }
+            if leftScore.secondary != rightScore.secondary { return leftScore.secondary < rightScore.secondary }
+            return left.offset < right.offset
+        }.map(\.element)
+    }
+
+    private func accountSortValue(_ profile: Profile) -> (primary: Double, secondary: Double) {
+        let windows = profile.snapshot?.windows.filter { $0.minutes == 300 || $0.minutes == 10_080 } ?? []
+        if config.accountSortOrder == "nextReset" {
+            let nextReset = windows.compactMap(\.reset).filter { $0 > Date() }.min()?.timeIntervalSince1970 ?? .greatestFiniteMagnitude
+            let remaining = windows.map(\.remaining).max() ?? -1
+            return (nextReset, Double(100 - remaining))
+        }
+        let remaining = windows.map(\.remaining).max() ?? -1
+        let nextReset = windows.compactMap(\.reset).filter { $0 > Date() }.min()?.timeIntervalSince1970 ?? .greatestFiniteMagnitude
+        return (Double(100 - remaining), nextReset)
+    }
 
     private func makeStorage() -> Storage {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -116,7 +140,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         if cli == nil { info("CLI unavailable · Select a binary in Settings", in: menu) }
         if config.profiles.isEmpty { info("No accounts connected", in: menu) }
         if hasNoUsageLeft { info("Cooked – no AI usage left", in: menu, color: .systemOrange) }
-        for profile in config.profiles {
+        for profile in orderedProfiles {
             menu.addItem(.separator())
             let manage = NSMenu()
             let summary = profile.snapshot == nil ? nil : accountAllowanceSummary(profile)
@@ -737,7 +761,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             entry.representedObject = option
             selection.menu?.addItem(entry)
         }
-        for profile in config.profiles {
+        for profile in orderedProfiles {
             let windows = profile.snapshot?.windows ?? []
             for window in windows where window.minutes == 300 {
                 if let week = windows.first(where: { $0.minutes == 10_080 && $0.bucketID == window.bucketID }) {
@@ -773,9 +797,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         choose.cell?.representedObject = binary
         let resetDisplay = NSButton(checkboxWithTitle: "Show time until reset", target: self, action: #selector(changeResetDisplay(_:)))
         resetDisplay.state = config.resetDisplayTimeLeft == true ? .on : .off
+        let autoSort = NSButton(checkboxWithTitle: "Sort accounts automatically", target: self, action: #selector(changeAccountSorting(_:)))
+        autoSort.state = config.automaticAccountSorting == true ? .on : .off
+        let sortOrder = NSPopUpButton()
+        sortOrder.addItems(withTitles: ["Most available", "Next reset"])
+        sortOrder.selectItem(at: config.accountSortOrder == "nextReset" ? 1 : 0)
+        sortOrder.isEnabled = config.automaticAccountSorting == true
+        sortOrder.target = self
+        sortOrder.action = #selector(changeAccountSortOrder(_:))
+        accountSortControl = sortOrder
         let general = settingsPage([
             fieldRow("Background refresh", interval),
             fieldRow("Menu bar display", selection),
+            autoSort,
+            fieldRow("Sort by", sortOrder),
             resetDisplay,
             launch,
             NSTextField(labelWithString: "Codex executable"),
@@ -874,7 +909,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let addAccount = NSButton(title: "Add Account…", target: self, action: #selector(add))
         let details = NSButton(title: "Account Details…", target: self, action: #selector(accountDetails))
         details.isEnabled = !config.profiles.isEmpty
-        let rows: [NSView] = config.profiles.map { profile in
+        let rows: [NSView] = orderedProfiles.map { profile in
             let name = NSTextField(labelWithString: profile.label)
             name.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
             let identity = NSTextField(labelWithString: profile.identity.context.isEmpty ? "Account details unavailable" : profile.identity.context)
@@ -901,6 +936,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 self?.moveProfile(source, to: destination)
             }
             let handle = AccountDragHandle(profileID: profile.id)
+            handle.isHidden = config.automaticAccountSorting == true
             let content = NSStackView(views: [handle, details])
             content.orientation = .horizontal
             content.alignment = .centerY
@@ -930,6 +966,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func moveProfile(_ source: UUID, to destination: UUID) {
+        guard config.automaticAccountSorting != true else { return }
         guard let sourceIndex = config.profiles.firstIndex(where: { $0.id == source }),
               let destinationIndex = config.profiles.firstIndex(where: { $0.id == destination }),
               sourceIndex != destinationIndex else { return }
@@ -942,6 +979,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     @objc private func changeResetDisplay(_ sender: NSButton) {
         change { $0.resetDisplayTimeLeft = sender.state == .on }
+    }
+
+    @objc private func changeAccountSorting(_ sender: NSButton) {
+        let enabled = sender.state == .on
+        change { $0.automaticAccountSorting = enabled }
+        accountSortControl?.isEnabled = enabled
+    }
+
+    @objc private func changeAccountSortOrder(_ sender: NSPopUpButton) {
+        change { $0.accountSortOrder = sender.indexOfSelectedItem == 1 ? "nextReset" : "mostAvailable" }
     }
 
     private func profileButton(_ title: String, selector: Selector, id: UUID) -> NSButton {

@@ -134,6 +134,8 @@ public struct Configuration: Codable, Equatable {
     public var menuWeeklyWindow: String?
     public var menuShowsMostAvailable: Bool?
     public var resetDisplayTimeLeft: Bool?
+    public var automaticAccountSorting: Bool?
+    public var accountSortOrder: String?
     public init() {}
 
     public var mostAvailable: (profile: Profile, window: Window)? {
@@ -148,7 +150,7 @@ public struct Configuration: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case profiles, lastRefreshed, minutes, binary, menuProfile, menuWindow, menuWeeklyWindow
-        case menuShowsMostAvailable, resetDisplayTimeLeft
+        case menuShowsMostAvailable, resetDisplayTimeLeft, automaticAccountSorting, accountSortOrder
     }
 
     public init(from decoder: Decoder) throws {
@@ -162,6 +164,8 @@ public struct Configuration: Codable, Equatable {
         menuWeeklyWindow = try values.decodeIfPresent(String.self, forKey: .menuWeeklyWindow)
         menuShowsMostAvailable = try values.decodeIfPresent(Bool.self, forKey: .menuShowsMostAvailable)
         resetDisplayTimeLeft = try values.decodeIfPresent(Bool.self, forKey: .resetDisplayTimeLeft)
+        automaticAccountSorting = try values.decodeIfPresent(Bool.self, forKey: .automaticAccountSorting)
+        accountSortOrder = try values.decodeIfPresent(String.self, forKey: .accountSortOrder)
     }
 }
 
