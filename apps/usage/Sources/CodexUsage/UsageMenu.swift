@@ -3,18 +3,14 @@ import ServiceManagement
 import UsageCore
 import WidgetKit
 
-final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate {
+final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
     private let appGroup = "group.com.an-mzn.codex-usage"
-    private lazy var storage = Storage(
-        root: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Codex Usage", isDirectory: true),
-        homeRoot: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Codex Usage", isDirectory: true)
-    )
+    private lazy var storage = makeStorage()
     private var config = Configuration()
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
+    private var settingsWindow: NSWindow?
+    private weak var settingsTabs: NSTabViewController?
     private let queue: OperationQueue = {
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 2
@@ -52,6 +48,22 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private var powerObserver: NSObjectProtocol?
     private var interval: TimeInterval { Double(min(120, max(5, config.minutes))) * 60 }
     private var cli: URL? { Client.executable(override: config.binary) }
+
+    private func makeStorage() -> Storage {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Codex Usage", isDirectory: true)
+        if let shared = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
+            do {
+                try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true,
+                                                        attributes: [.posixPermissions: 0o700])
+                let values = try FileManager.default.attributesOfItem(atPath: shared.path)
+                if values[.ownerAccountID] as? NSNumber == NSNumber(value: getuid()), access(shared.path, W_OK) == 0 {
+                    return Storage(root: shared, homeRoot: support)
+                }
+            } catch { }
+        }
+        return Storage(root: support, homeRoot: support)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { config = try storage.load() }
@@ -113,8 +125,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             if let snapshot = profile.snapshot {
                 if snapshot.windows.isEmpty { info("No allowance windows returned", in: menu) }
                 for window in snapshot.windows {
-                    let reset = window.reset.map { " · resets \(dateText($0))" } ?? ""
-                    info("\(shortWindowTitle(window))   \(window.remaining)% left\(reset)", in: menu)
+                    usageRow(window, in: menu)
                 }
             }
             if let job = jobs[profile.id] {
@@ -140,17 +151,44 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         if let loginID {
             action("Show Sign-In", #selector(showSignIn), in: menu)
             action("Cancel Sign-In", #selector(cancelSignIn), in: menu, id: loginID)
-        } else {
-            action("Add Account…", #selector(add), in: menu)
         }
-        action("Refresh All", #selector(refreshAll), in: menu, key: "r")
         action("Settings…", #selector(settings), in: menu, key: ",")
         action("Quit Codex Usage", #selector(quit), in: menu, key: "q")
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        // Leave visible cached rows in place during native menu tracking.
-        DispatchQueue.main.async { [weak self] in self?.automatic(onOpen: true) }
+        // Opening the status item performs a full refresh while cached rows stay visible.
+        DispatchQueue.main.async { [weak self] in self?.beginRefreshBatch(manual: true) }
+    }
+
+    private func usageRow(_ window: Window, in menu: NSMenu) {
+        let title = NSTextField(labelWithString: shortWindowTitle(window))
+        title.font = .menuFont(ofSize: 0)
+        title.textColor = .labelColor
+        let remaining = NSTextField(labelWithString: "\(window.remaining)% left")
+        remaining.font = .menuFont(ofSize: 0)
+        remaining.textColor = .labelColor
+        let reset = NSTextField(labelWithString: window.reset.map(dateText) ?? "")
+        reset.font = .menuFont(ofSize: 0)
+        reset.textColor = .secondaryLabelColor
+        reset.alignment = .right
+        let row = NSStackView(views: [title, remaining, NSView(), reset])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.setCustomSpacing(0, after: row.views[2])
+        row.translatesAutoresizingMaskIntoConstraints = false
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 24))
+        host.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 14),
+            row.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -14),
+            row.centerYAnchor.constraint(equalTo: host.centerYAnchor),
+            reset.widthAnchor.constraint(greaterThanOrEqualToConstant: 180)
+        ])
+        let entry = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        entry.view = host
+        menu.addItem(entry)
     }
 
     private func info(_ title: String, in menu: NSMenu) {
@@ -214,6 +252,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         try storage.save(next)
         config = next
         storageProblem = false
+        if let settingsTabs, settingsTabs.tabView.tabViewItems.count > 1 {
+            settingsTabs.tabView.tabViewItems[1].viewController = pageController(title: "Accounts", view: accountSettingsPage())
+        }
         WidgetCenter.shared.reloadAllTimelines()
         updateIcon()
     }
@@ -251,10 +292,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         self.timer = timer
     }
 
-    private func automatic(onOpen: Bool = false) {
+    private func automatic() {
         defer { updateIcon(); schedule() }
         guard !asleep, !quitPending, !ProcessInfo.processInfo.isLowPowerModeEnabled,
-              (onOpen || Date() >= grace), cli != nil else { return }
+              Date() >= grace, cli != nil else { return }
         let now = Date()
         let hasDueAccount = config.profiles.contains { profile in
             guard jobs[profile.id] == nil else { return false }
@@ -570,8 +611,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     @objc private func settings() {
-        let dialog = NSAlert()
-        dialog.messageText = "Codex Usage Settings"
+        if let settingsWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow.makeKeyAndOrderFront(nil)
+            return
+        }
         let interval = NSPopUpButton()
         let choices = [5, 10, 15, 30, 60, 120]
         interval.addItems(withTitles: choices.map { "\($0) minutes" })
@@ -630,20 +674,105 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         binary.setAccessibilityLabel("Codex executable path")
         let choose = NSButton(title: "Choose Executable…", target: self, action: #selector(chooseBinary(_:)))
         choose.cell?.representedObject = binary
-        let accounts = NSButton(title: "Account Details…", target: self, action: #selector(accountDetails))
-        accounts.isEnabled = !config.profiles.isEmpty
-        let stack = NSStackView(views: [NSTextField(labelWithString: "Background refresh"), interval,
-                                       NSTextField(labelWithString: "Menu bar display"), selection, accounts, launch,
-                                       NSTextField(labelWithString: "Codex executable"), binary, choose])
+        let general = settingsPage([
+            fieldRow("Background refresh", interval),
+            fieldRow("Menu bar display", selection),
+            launch,
+            NSTextField(labelWithString: "Codex executable"),
+            binary,
+            choose
+        ])
+        let accountsPage = accountSettingsPage()
+        let generalItem = NSTabViewItem(viewController: pageController(title: "General", view: general))
+        generalItem.label = "General"
+        generalItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        let accountsItem = NSTabViewItem(viewController: pageController(title: "Accounts", view: accountsPage))
+        accountsItem.label = "Accounts"
+        accountsItem.image = NSImage(systemSymbolName: "person.2", accessibilityDescription: nil)
+        let tabs = NSTabViewController()
+        tabs.tabStyle = .toolbar
+        tabs.addTabViewItem(generalItem)
+        tabs.addTabViewItem(accountsItem)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Codex Usage"
+        window.contentViewController = tabs
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        settingsWindow = window
+        settingsTabs = tabs
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func fieldRow(_ title: String, _ control: NSView) -> NSView {
+        let label = NSTextField(labelWithString: title)
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        let row = NSStackView(views: [label, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 14
+        return row
+    }
+
+    private func settingsPage(_ views: [NSView]) -> NSView {
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 8
-        binary.widthAnchor.constraint(equalToConstant: 380).isActive = true
-        stack.setFrameSize(stack.fittingSize)
-        dialog.accessoryView = stack
-        dialog.addButton(withTitle: "Done")
-        NSApp.activate(ignoringOtherApps: true)
-        dialog.runModal()
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let container = NSView()
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: container.bottomAnchor, constant: -24)
+        ])
+        return container
+    }
+
+    private func pageController(title: String, view: NSView) -> NSViewController {
+        let controller = NSViewController()
+        controller.title = title
+        controller.view = view
+        return controller
+    }
+
+    private func accountSettingsPage() -> NSView {
+        let intro = NSTextField(labelWithString: "Manage connected ChatGPT accounts and refresh their usage.")
+        intro.textColor = .secondaryLabelColor
+        let refresh = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
+        refresh.keyEquivalent = "r"
+        let addAccount = NSButton(title: "Add Account…", target: self, action: #selector(add))
+        let details = NSButton(title: "Account Details…", target: self, action: #selector(accountDetails))
+        details.isEnabled = !config.profiles.isEmpty
+        let rows: [NSView] = config.profiles.map { profile in
+            let name = NSTextField(labelWithString: profile.label)
+            name.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+            let identity = NSTextField(labelWithString: profile.identity.context.isEmpty ? "Account details unavailable" : profile.identity.context)
+            identity.textColor = .secondaryLabelColor
+            identity.lineBreakMode = .byTruncatingTail
+            let column = NSStackView(views: [name, identity])
+            column.orientation = .vertical
+            column.alignment = .leading
+            column.spacing = 3
+            return column
+        }
+        var content: [NSView] = [intro, refresh, addAccount, details]
+        if !rows.isEmpty {
+            let divider = NSBox()
+            divider.boxType = .separator
+            content.append(divider)
+            content.append(contentsOf: rows)
+        } else {
+            let empty = NSTextField(labelWithString: "No accounts connected yet.")
+            empty.textColor = .secondaryLabelColor
+            content.append(empty)
+        }
+        return settingsPage(content)
     }
 
     @objc private func changeRefreshInterval(_ sender: NSPopUpButton) {
@@ -704,6 +833,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             return context.isEmpty ? profile.label : "\(profile.label)\n\(context)"
         }
         alert("Account Details", details.joined(separator: "\n\n"))
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if notification.object as? NSWindow === settingsWindow {
+            settingsWindow = nil
+            settingsTabs = nil
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     @objc private func chooseBinary(_ sender: NSButton) {
