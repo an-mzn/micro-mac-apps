@@ -40,8 +40,13 @@ public struct Client {
         let directories = path.split(separator: ":").map(String.init)
             + ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"]
         let candidates = override.map { [$0] } ?? ([bundledCLI] + directories.map { $0 + "/codex" })
-        return candidates.first {
-            $0.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: $0)
+        let files = FileManager.default
+        return candidates.first { candidate in
+            var isDirectory: ObjCBool = false
+            return candidate.hasPrefix("/")
+                && files.fileExists(atPath: candidate, isDirectory: &isDirectory)
+                && !isDirectory.boolValue
+                && files.isExecutableFile(atPath: candidate)
         }.map { URL(fileURLWithPath: $0) }
     }
 

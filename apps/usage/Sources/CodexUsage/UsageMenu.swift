@@ -2,7 +2,7 @@ import AppKit
 import ServiceManagement
 import UsageCore
 
-final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate {
     private let storage = Storage(root: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Codex Usage", isDirectory: true))
     private var config = Configuration()
@@ -555,6 +555,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dialog.runModal()
     }
 
+    private struct DisplayOption {
+        let profile: UUID
+        let window: String
+        let week: String?
+    }
+
     @objc private func settings() {
         let dialog = NSAlert()
         dialog.messageText = "Codex Usage Settings"
@@ -562,16 +568,25 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let choices = [5, 10, 15, 30, 60, 120]
         interval.addItems(withTitles: choices.map { "\($0) minutes" })
         interval.selectItem(at: choices.firstIndex(of: config.minutes) ?? 2)
+        for (item, minutes) in zip(interval.itemArray, choices) { item.tag = minutes }
+        interval.target = self
+        interval.action = #selector(changeRefreshInterval(_:))
         interval.setAccessibilityLabel("Background refresh interval")
         let selection = NSPopUpButton()
         selection.setAccessibilityLabel("Menu bar allowance")
         selection.addItem(withTitle: "Icon only")
         selection.addItem(withTitle: "Most allowance available")
+        selection.lastItem?.tag = 1
+        selection.target = self
+        selection.action = #selector(changeMenuDisplay(_:))
         let profileOptionsStart = selection.numberOfItems
-        var options: [(profile: UUID, window: String, week: String?)] = []
+        var options: [DisplayOption] = []
         func addOption(_ title: String, profile: UUID, window: String, week: String? = nil) {
-            options.append((profile, window, week))
-            selection.menu?.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+            let option = DisplayOption(profile: profile, window: window, week: week)
+            options.append(option)
+            let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            entry.representedObject = option
+            selection.menu?.addItem(entry)
         }
         for profile in config.profiles {
             let windows = profile.snapshot?.windows ?? []
@@ -599,11 +614,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 selection.selectItem(at: selection.numberOfItems - 1)
             }
         }
-        let loginBefore = SMAppService.mainApp.status
-        let launch = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
-        launch.state = (loginBefore == .enabled || loginBefore == .requiresApproval) ? .on : .off
+        let launch = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(changeLaunchAtLogin(_:)))
+        launch.state = launchAtLoginEnabled ? .on : .off
         let binary = NSTextField(string: config.binary ?? "")
         binary.placeholderString = "Automatic discovery"
+        binary.delegate = self
         binary.setAccessibilityLabel("Codex executable path")
         let choose = NSButton(title: "Choose Executable…", target: self, action: #selector(chooseBinary(_:)))
         choose.cell?.representedObject = binary
@@ -618,38 +633,61 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         binary.widthAnchor.constraint(equalToConstant: 380).isActive = true
         stack.setFrameSize(stack.fittingSize)
         dialog.accessoryView = stack
-        dialog.addButton(withTitle: "Save")
-        dialog.addButton(withTitle: "Cancel")
+        dialog.addButton(withTitle: "Done")
         NSApp.activate(ignoringOtherApps: true)
-        guard dialog.runModal() == .alertFirstButtonReturn else { return }
-        let path = binary.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard path.isEmpty || Client.executable(override: path) != nil else {
-            alert("CLI unavailable", "Choose an absolute path to an executable Codex binary.")
-            return
-        }
-        let index = selection.indexOfSelectedItem - profileOptionsStart
-        let option = options.indices.contains(index) ? options[index] : nil
+        dialog.runModal()
+    }
+
+    @objc private func changeRefreshInterval(_ sender: NSPopUpButton) {
+        guard let minutes = sender.selectedItem?.tag else { return }
+        change { $0.minutes = minutes }
+        sender.selectItem(withTag: config.minutes)
+    }
+
+    @objc private func changeMenuDisplay(_ sender: NSPopUpButton) {
+        let option = sender.selectedItem?.representedObject as? DisplayOption
         change {
-            $0.minutes = choices[max(0, interval.indexOfSelectedItem)]
-            $0.binary = path.isEmpty ? nil : path
             $0.menuProfile = option?.profile
             $0.menuWindow = option?.window
             $0.menuWeeklyWindow = option?.week
-            $0.menuShowsMostAvailable = selection.indexOfSelectedItem == 1
+            $0.menuShowsMostAvailable = sender.selectedItem?.tag == 1
         }
+    }
+
+    private var launchAtLoginEnabled: Bool {
+        let status = SMAppService.mainApp.status
+        return status == .enabled || status == .requiresApproval
+    }
+
+    @objc private func changeLaunchAtLogin(_ sender: NSButton) {
+        let wantsOn = sender.state == .on
         do {
-            let wasOn = loginBefore == .enabled || loginBefore == .requiresApproval
-            let wantsOn = launch.state == .on
-            if wantsOn != wasOn {
-                if wantsOn { try SMAppService.mainApp.register() }
-                else { try SMAppService.mainApp.unregister() }
-            }
+            if wantsOn { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
             if wantsOn && SMAppService.mainApp.status == .requiresApproval {
                 alert("Launch at login needs approval", "Enable Codex Usage in System Settings under General → Login Items.")
             }
         } catch {
             alert("Could not change launch at login", error.localizedDescription)
         }
+        sender.state = launchAtLoginEnabled ? .on : .off
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard let field = notification.object as? NSTextField else { return }
+        updateBinary(field)
+    }
+
+    private func updateBinary(_ field: NSTextField) {
+        let path = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let valid = path.isEmpty || Client.executable(override: path) != nil
+        let warning = valid ? nil : "Choose an absolute path to an executable Codex binary."
+        field.textColor = valid ? .labelColor : .systemRed
+        field.toolTip = warning
+        field.setAccessibilityHelp(warning)
+        guard valid else { return }
+        let binary = path.isEmpty ? nil : path
+        if binary != config.binary { change { $0.binary = binary } }
     }
 
     @objc private func accountDetails() {
@@ -665,7 +703,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let picker = NSOpenPanel()
         picker.message = "Select the Codex executable"
         picker.treatsFilePackagesAsDirectories = true
-        if picker.runModal() == .OK, let url = picker.url { field.stringValue = url.path }
+        if picker.runModal() == .OK, let url = picker.url {
+            field.stringValue = url.path
+            updateBinary(field)
+        }
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
