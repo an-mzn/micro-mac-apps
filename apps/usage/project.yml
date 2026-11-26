@@ -1,0 +1,70 @@
+name: CodexUsage
+options:
+  bundleIdPrefix: com.an-mzn.codex-usage
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+targets:
+  UsageCore:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/UsageCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.an-mzn.codex-usage.UsageCore
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+  CodexUsage:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/CodexUsage
+      - path: Assets/codex-refresh.svg
+        buildPhase: resources
+    dependencies:
+      - target: UsageCore
+      - target: CodexUsageWidget
+        embed: true
+    entitlements:
+      path: App.entitlements
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Codex Usage
+        CFBundleName: Codex Usage
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: true
+        NSHighResolutionCapable: true
+  CodexUsageWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Sources/CodexUsageWidget
+    info:
+      path: $HOME/Developer/micro-mac-apps/apps/usage/Widget-Info.plist
+    dependencies:
+      - target: UsageCore
+    entitlements:
+      path: Widget.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.an-mzn.codex-usage.widget
+        APPLICATION_EXTENSION_API_ONLY: YES
+  UsageCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/UsageCoreTests
+    dependencies:
+      - target: UsageCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.an-mzn.codex-usage.tests

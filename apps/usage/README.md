@@ -4,7 +4,7 @@ A native menu bar app for comparing ChatGPT-backed Codex allowance across accoun
 
 ## Install and connect
 
-Build **Codex Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the cloud refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package is arm64 and targets macOS 13 or later. It was exercised on macOS 27.2.1.
+Build **Codex Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package targets macOS 14 or later.
 
 1. Open the menu and choose **Add Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
@@ -12,9 +12,11 @@ Build **Codex Usage.app** using the instructions below, then open it from `dist/
 
 The app checks for the CLI bundled in ChatGPT, then checks absolute PATH entries, Homebrew, and common user install locations. Choose a different executable in **Settings…**. The minimum verified CLI is **codex-cli 0.171.0-alpha.13.2** (bundled with ChatGPT on the test Mac). Other builds need the documented stdio handshake with `codexHome`, account reads, and ChatGPT device-code login. Older builds were not tested. [Codex App Server documentation](https://developers.openai.com/codex/app-server)
 
+The **Codex executable** setting is the path to the Codex command-line program (`codex`) that the app launches in the background to sign in and read allowance. Automatic discovery is the recommended setting. Choose a binary only if the app cannot find your Codex installation or you want to use another supported version.
+
 ## Refresh and settings
 
-Cached readings appear immediately. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile.
+Cached readings appear immediately in the menu and widget. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile. The widget supports small and medium macOS widget sizes: the small widget shows the first connected account, and the medium widget shows accounts side by side. Both show the 5-hour and weekly remaining percentage in circular gauges inspired by Apple’s battery rings. Widget updates use the same background refresh cadence and cached values; they do not trigger live account requests.
 
 Use **Refresh All** for an immediate shared refresh. When an automatic refresh is due, the app refreshes eligible accounts together and shows one last-refreshed time. Account emails and workspace details are available under **Settings → Account Details**. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. **Most allowance available** shows the account with the highest remaining percentage, comparing each account’s 5-hour reading or its weekly reading if the 5-hour window is absent. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
 
@@ -26,12 +28,13 @@ Codex stores each profile’s authentication inside its own private `CODEX_HOME`
 
 ## Build and test
 
-Run from this project directory with the Xcode command-line tools installed. The signed app is written to `dist/`. The optional argument sets the output directory.
+Run from this project directory on macOS with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen) installed. The signed app, including its WidgetKit extension, is written to `dist/`. The optional argument sets the output directory. XcodeGen can be installed with `brew install xcodegen`.
 
 ```sh
-swift test -c release
 ./build.sh
 ```
+
+The widget and menu app share cached settings in the signed application group `group.com.an-mzn.codex-usage`. Profile authentication remains isolated under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. On first launch after upgrading, the previous settings file is copied into the shared container automatically. A locally ad hoc signed build cannot activate that app group unless the group is registered and enabled for the signing team.
 
 Eight Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, automatic 5-hour and weekly comparison, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
 

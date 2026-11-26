@@ -1,10 +1,17 @@
 import AppKit
 import ServiceManagement
 import UsageCore
+import WidgetKit
 
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate {
-    private let storage = Storage(root: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Codex Usage", isDirectory: true))
+    private let appGroup = "group.com.an-mzn.codex-usage"
+    private lazy var storage = Storage(
+        root: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Codex Usage", isDirectory: true),
+        homeRoot: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Codex Usage", isDirectory: true)
+    )
     private var config = Configuration()
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
@@ -207,6 +214,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         try storage.save(next)
         config = next
         storageProblem = false
+        WidgetCenter.shared.reloadAllTimelines()
         updateIcon()
     }
 
@@ -217,7 +225,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             try commit(next)
         } catch {
             storageProblem = true
-            alert("Could not save settings", "Check access to the Codex Usage Application Support directory.")
+            alert("Could not save settings", "Check access to the shared Codex Usage storage.")
         }
         schedule()
     }
