@@ -243,6 +243,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let title = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
         title.isBordered = false
         title.alignment = .left
+        title.contentTintColor = .labelColor
+        title.attributedTitle = NSAttributedString(string: "Refresh All", attributes: [
+            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor
+        ])
         let last = NSTextField(labelWithString: config.lastRefreshed.map { "Last refreshed \(dateText($0))" } ?? "Not refreshed yet")
         last.font = .menuFont(ofSize: 0)
         last.textColor = .tertiaryLabelColor
