@@ -83,7 +83,8 @@ public struct Client {
             if let expected = identity.workspaceID, let actual = limits.accountId, expected != actual {
                 throw UsageError.rejected
             }
-            return (identity, Snapshot(windows: limits.windows))
+            return (identity, Snapshot(windows: limits.windows, creditBalance: limits.creditBalance,
+                                       unlimitedCredits: limits.unlimitedCredits))
         }
     }
 

@@ -61,6 +61,11 @@ public struct Window: Codable, Equatable {
 
 public struct Limits: Decodable {
     struct Bucket: Decodable {
+        struct Credits: Decodable {
+            let hasCredits: Bool
+            let unlimited: Bool
+            let balance: String?
+        }
         struct Reading: Decodable {
             let usedPercent: Double
             let windowDurationMins: Int?
@@ -70,10 +75,25 @@ public struct Limits: Decodable {
         let limitName: String?
         let primary: Reading?
         let secondary: Reading?
+        let credits: Credits?
     }
     let rateLimits: Bucket?
     let rateLimitsByLimitId: [String: Bucket]?
     public let accountId: String?
+
+    public var creditBalance: String? {
+        if let credits = rateLimits?.credits ?? rateLimitsByLimitId?["codex"]?.credits {
+            return credits.balance
+        }
+        return nil
+    }
+
+    public var unlimitedCredits: Bool? {
+        if let credits = rateLimits?.credits ?? rateLimitsByLimitId?["codex"]?.credits {
+            return credits.unlimited
+        }
+        return nil
+    }
 
     public var windows: [Window] {
         var buckets = rateLimitsByLimitId ?? [:]
@@ -96,10 +116,14 @@ public struct Limits: Decodable {
 public struct Snapshot: Codable, Equatable {
     public let at: Date
     public let windows: [Window]
+    public let creditBalance: String?
+    public let unlimitedCredits: Bool?
 
-    public init(at: Date = Date(), windows: [Window]) {
+    public init(at: Date = Date(), windows: [Window], creditBalance: String? = nil, unlimitedCredits: Bool? = nil) {
         self.at = at
         self.windows = windows
+        self.creditBalance = creditBalance
+        self.unlimitedCredits = unlimitedCredits
     }
 
     public func due(interval: TimeInterval, now: Date = Date()) -> Bool {

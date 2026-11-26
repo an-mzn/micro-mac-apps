@@ -143,7 +143,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         for profile in orderedProfiles {
             menu.addItem(.separator())
             let manage = NSMenu()
-            let summary = profile.snapshot == nil ? nil : accountAllowanceSummary(profile)
+            let summary = profile.snapshot == nil ? nil : accountCreditSummary(profile)
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             if let summary {
                 header.attributedTitle = NSAttributedString(string: "\(profile.label)    \(summary)", attributes: [
@@ -306,16 +306,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return !balances.isEmpty && balances.allSatisfy { $0 == 0 }
     }
 
-    private func accountAllowanceSummary(_ profile: Profile) -> String {
-        let windows = profile.snapshot?.windows ?? []
-        let primary = windows.filter { $0.bucketID == "codex" }
-        let candidates = primary.isEmpty ? windows : primary
-        let current = candidates.first { $0.minutes == 300 } ?? candidates.first { $0.minutes == 10_080 }
-        let weekly = candidates.first { $0.minutes == 10_080 }
-        var values = [String]()
-        if let current { values.append("\(current.minutes == 300 ? "5h" : "Wk") · \(current.remaining) credits") }
-        if let weekly, current?.id != weekly.id { values.append("Wk · \(weekly.remaining) credits") }
-        return values.joined(separator: " · ")
+    private func accountCreditSummary(_ profile: Profile) -> String? {
+        guard let snapshot = profile.snapshot else { return nil }
+        if snapshot.unlimitedCredits == true { return "Unlimited credits" }
+        guard let balance = snapshot.creditBalance,
+              let decimal = Decimal(string: balance, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 0
+        return "\(formatter.string(from: NSDecimalNumber(decimal: decimal)) ?? balance) credits"
     }
 
     private func updateIcon() {
