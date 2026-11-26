@@ -232,6 +232,7 @@ private struct UsageWidgetView: View {
             Text("Usage").font(.system(size: 14, weight: .semibold))
             Spacer(minLength: 0)
         }
+        .offset(y: -3)
     }
     private func resetTimeLeft(_ reset: Date) -> String {
         let seconds = max(0, reset.timeIntervalSince(entry.date))
