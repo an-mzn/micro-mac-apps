@@ -191,10 +191,6 @@ private struct UsageWidgetView: View {
                     .accessibilityHidden(true)
             }
             Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
-            if entry.accounts.count > 1 {
-                Text("\(min(entry.accounts.count, 3)) of \(entry.accounts.count) accounts")
-                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            }
         }
     }
     @ViewBuilder
