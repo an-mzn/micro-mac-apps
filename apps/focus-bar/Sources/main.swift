@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate, N
             string: text,
             attributes: [.baselineOffset: -1]
         )
-        title.append(NSAttributedString(string: text.isEmpty ? "✦" : " ✦", attributes: [.baselineOffset: -2]))
+        title.append(NSAttributedString(string: text.isEmpty ? "✦" : " ✦", attributes: [.baselineOffset: -1]))
         statusItem.button?.attributedTitle = title
     }
 
