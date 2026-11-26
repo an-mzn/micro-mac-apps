@@ -38,6 +38,10 @@ public struct Window: Codable, Equatable {
     public let used: Double
     public let reset: Date?
 
+    public var bucketID: String {
+        String(id.dropLast(slot.count + 1))
+    }
+
     public var remaining: Int { Int(max(0, min(100, 100 - used)).rounded()) }
 
     public var title: String {
@@ -126,6 +130,7 @@ public struct Configuration: Codable, Equatable {
     public var binary: String?
     public var menuProfile: UUID?
     public var menuWindow: String?
+    public var menuWeeklyWindow: String?
     public init() {}
 }
 

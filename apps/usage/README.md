@@ -16,7 +16,7 @@ The app checks for the CLI bundled in ChatGPT, then checks absolute PATH entries
 
 Cached readings appear immediately. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile.
 
-Use **Refresh All** or the account submenu’s **Refresh Account** for an immediate read. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a selected window in the menu bar, where an asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
+Use **Refresh All** or the account submenu’s **Refresh Account** for an immediate read. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
 
 ## Profile storage and removal
 

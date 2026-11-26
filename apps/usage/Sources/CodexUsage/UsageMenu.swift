@@ -160,12 +160,23 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateIcon() {
         let profile = config.profiles.first { $0.id == config.menuProfile }
-        let window = profile?.snapshot?.windows.first { $0.id == config.menuWindow }
+        let windows = profile?.snapshot?.windows ?? []
+        let showsBoth = config.menuWeeklyWindow != nil
+        let window = windows.first { $0.id == config.menuWindow && (!showsBoth || $0.minutes == 300) }
+        let week = windows.first { $0.id == config.menuWeeklyWindow && $0.minutes == 10_080 }
+        let values: [String]
+        if showsBoth {
+            values = [window.map { "5h \($0.remaining)%" }, week.map { "Wk \($0.remaining)%" }].compactMap { $0 }
+        } else {
+            values = window.map { ["\($0.remaining)%"] } ?? []
+        }
         let stale = profile.map { p in
             p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
         } ?? false
-        item.button?.title = window.map { " \($0.remaining)%\(stale ? "*" : "")" } ?? ""
-        item.button?.toolTip = window.map { "\($0.title) · \($0.remaining)% left\(stale ? " · stale" : "")" } ?? "Codex Usage"
+        item.button?.title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
+        let details = [window, week].compactMap { $0 }.map { "\($0.title) · \($0.remaining)% left" }
+        item.button?.toolTip = details.isEmpty ? "Codex Usage" :
+            details.joined(separator: " | ") + (stale ? " · stale" : "")
         item.button?.setAccessibilityLabel(item.button?.toolTip ?? "Codex Usage")
     }
 
@@ -455,7 +466,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try result.get()
                     var next = self.config
                     next.profiles.removeAll { $0.id == id }
-                    if next.menuProfile == id { next.menuProfile = nil; next.menuWindow = nil }
+                    if next.menuProfile == id {
+                        next.menuProfile = nil
+                        next.menuWindow = nil
+                        next.menuWeeklyWindow = nil
+                    }
                     try self.commit(next)
                     self.failures.removeValue(forKey: id)
                 } catch {
@@ -500,16 +515,34 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let selection = NSPopUpButton()
         selection.setAccessibilityLabel("Menu bar allowance")
         selection.addItem(withTitle: "Icon only")
-        var pairs: [(UUID, String)] = []
+        var options: [(profile: UUID, window: String, week: String?)] = []
+        func addOption(_ title: String, profile: UUID, window: String, week: String? = nil) {
+            options.append((profile, window, week))
+            selection.menu?.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+        }
         for profile in config.profiles {
-            for window in profile.snapshot?.windows ?? [] {
-                pairs.append((profile.id, window.id))
-                selection.menu?.addItem(NSMenuItem(title: "\(profile.label) · \(window.title)",
-                                                   action: nil, keyEquivalent: ""))
+            let windows = profile.snapshot?.windows ?? []
+            for window in windows where window.minutes == 300 {
+                if let week = windows.first(where: { $0.minutes == 10_080 && $0.bucketID == window.bucketID }) {
+                    addOption("\(profile.label) · \(window.bucket) · 5-hour + weekly",
+                              profile: profile.id, window: window.id, week: week.id)
+                }
+            }
+            for window in windows {
+                addOption("\(profile.label) · \(window.title)", profile: profile.id, window: window.id)
             }
         }
-        if let index = pairs.firstIndex(where: { $0.0 == config.menuProfile && $0.1 == config.menuWindow }) {
-            selection.selectItem(at: index + 1)
+        if let profileID = config.menuProfile, let windowID = config.menuWindow,
+           let profile = config.profiles.first(where: { $0.id == profileID }) {
+            if let index = options.firstIndex(where: {
+                $0.profile == profileID && $0.window == windowID && $0.week == config.menuWeeklyWindow
+            }) {
+                selection.selectItem(at: index + 1)
+            } else {
+                addOption("\(profile.label) · Saved display (reading unavailable)",
+                          profile: profileID, window: windowID, week: config.menuWeeklyWindow)
+                selection.selectItem(at: options.count)
+            }
         }
         let loginBefore = SMAppService.mainApp.status
         let launch = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
@@ -538,12 +571,13 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         let index = selection.indexOfSelectedItem - 1
-        let pair = pairs.indices.contains(index) ? pairs[index] : nil
+        let option = options.indices.contains(index) ? options[index] : nil
         change {
             $0.minutes = choices[max(0, interval.indexOfSelectedItem)]
             $0.binary = path.isEmpty ? nil : path
-            $0.menuProfile = pair?.0
-            $0.menuWindow = pair?.1
+            $0.menuProfile = option?.profile
+            $0.menuWindow = option?.window
+            $0.menuWeeklyWindow = option?.week
         }
         do {
             let wasOn = loginBefore == .enabled || loginBefore == .requiresApproval
