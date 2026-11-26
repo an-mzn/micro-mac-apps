@@ -4,7 +4,7 @@ import UsageCore
 import WidgetKit
 
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
-    private let appGroup = "group.com.an-mzn.codex-usage"
+    private let appGroup = "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
     private var config = Configuration()
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -102,7 +102,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeading
-        item.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         item.menu = menu
         menu.delegate = self
         updateIcon()
@@ -335,7 +334,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let stale = profile.map { p in
             p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
         } ?? false
-        item.button?.title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
+        let title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
+        if let button = item.button {
+            // Align the image-leading title with the surrounding menu bar text.
+            button.attributedTitle = NSAttributedString(string: title, attributes: [
+                .font: NSFont.menuBarFont(ofSize: 0),
+                .baselineOffset: -1
+            ])
+        }
         var details = [window, week].compactMap { $0 }.map { "\($0.title) · \($0.remaining)% left" }
         if let mostAvailable { details.insert(mostAvailable.profile.label, at: 0) }
         item.button?.toolTip = details.isEmpty ? "Usage" :
@@ -843,7 +849,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         settingsWindow = window
         settingsTabs = tabs
         installApplicationMenu()
-        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
@@ -1096,7 +1101,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         if notification.object as? NSWindow === settingsWindow {
             settingsWindow = nil
             settingsTabs = nil
-            NSApp.setActivationPolicy(.accessory)
         }
     }
 

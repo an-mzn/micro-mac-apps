@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 import UsageCore
 
-private let appGroup = "group.com.an-mzn.codex-usage"
+private let appGroup = "7FVL4J2UZ9.com.an-mzn.codex-usage"
 
 private struct Allowance: Identifiable {
     let id: String

@@ -28,13 +28,13 @@ Codex stores each profile’s authentication inside its own private `CODEX_HOME`
 
 ## Build and test
 
-Run from this project directory on macOS with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen) installed. The signed app, including its WidgetKit extension, is written to `dist/`. The optional argument sets the output directory. XcodeGen can be installed with `brew install xcodegen`.
+Run from this project directory on macOS with Xcode, XcodeGen, and the matching Apple Development signing identity installed. The signed app, including its WidgetKit extension, is written to `dist/`. The optional argument sets the output directory. Override the default signing identity SHA-1 with `USAGE_SIGNING_IDENTITY` if needed. XcodeGen can be installed with `brew install xcodegen`.
 
 ```sh
 ./build.sh
 ```
 
-The widget and menu app share cached settings in the signed application group `group.com.an-mzn.codex-usage`. Profile authentication remains isolated under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. On first launch after upgrading, the previous settings file is copied into the shared container automatically. A locally ad hoc signed build cannot activate that app group unless the group is registered and enabled for the signing team.
+The widget and menu app share cached settings in the macOS application group `7FVL4J2UZ9.com.an-mzn.codex-usage`. Profile authentication remains isolated under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. On first launch after upgrading, the previous settings file is copied into the shared container automatically. The local build is signed with the matching Apple Development identity because macOS only permits the signed team to use this team-prefixed group identifier. Team-prefixed app groups are macOS-only and don’t require a paid Apple Developer Program membership or a provisioning profile. For a different signing team, replace `7FVL4J2UZ9` in the group identifier in the app, widget, and both entitlements files.
 
 Eight Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, automatic 5-hour and weekly comparison, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
 

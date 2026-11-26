@@ -9,20 +9,20 @@ xcodegen generate
 xcodebuild -project CodexUsage.xcodeproj -scheme CodexUsage -configuration Release \
     -derivedDataPath .xcodebuild CODE_SIGNING_ALLOWED=NO build
 out="${1:-$PWD/dist}"
+signing_identity="${USAGE_SIGNING_IDENTITY:-REDACTED}"
 mkdir -p "$out"
 app="$out/Usage.app"
 staging="$out/.Usage.app.new"
 rm -rf "$staging"
 ditto .xcodebuild/Build/Products/Release/CodexUsage.app "$staging"
-codesign --force --deep --sign - --entitlements App.entitlements "$staging/Contents/Frameworks/UsageCore.framework"
-codesign --force --deep --sign - --entitlements Widget.entitlements \
-    "$staging/Contents/PlugIns/CodexUsageWidget.appex/Contents/MacOS/CodexUsageWidget"
-codesign --force --sign - --entitlements Widget.entitlements "$staging/Contents/PlugIns/CodexUsageWidget.appex"
-codesign --force --deep --sign - --entitlements App.entitlements "$staging"
+codesign --force --deep --sign "$signing_identity" "$staging/Contents/Frameworks/UsageCore.framework"
+codesign --force --sign "$signing_identity" --entitlements Widget.entitlements \
+    "$staging/Contents/PlugIns/CodexUsageWidget.appex"
+codesign --force --sign "$signing_identity" --entitlements App.entitlements "$staging"
 if [[ -e "$app" ]]; then rm -rf "$app"; fi
 mv "$staging" "$app"
 if [[ "$out" == "$PWD/dist" && -e "$out/Codex Usage.app" ]]; then
     rm -rf "$out/Codex Usage.app"
 fi
-codesign --verify --deep --strict "$app"
+codesign --verify --deep --strict --verbose=2 "$app"
 printf '%s\n' "$app"

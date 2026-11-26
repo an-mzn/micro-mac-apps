@@ -1,0 +1,25 @@
+{
+  "fill-specializations": [
+    { "value": { "solid": "srgb:0.16,0.17,0.19,1.0" } },
+    { "appearance": "dark", "value": "system-dark" }
+  ],
+  "groups": [
+    {
+      "name": "Usage mark",
+      "layers": [
+        {
+          "name": "Cloud terminal refresh",
+          "image-name": "codex-usage.svg",
+          "fill-specializations": [
+            { "value": { "solid": "srgb:0.86,0.89,0.92,1.0" } },
+            { "appearance": "dark", "value": { "solid": "srgb:0.86,0.89,0.92,1.0" } }
+          ],
+          "position": { "scale": 0.78, "translation-in-points": [0, 0] },
+          "glass": true
+        }
+      ],
+      "specular": true
+    }
+  ],
+  "supported-platforms": { "squares": ["macOS"] }
+}
