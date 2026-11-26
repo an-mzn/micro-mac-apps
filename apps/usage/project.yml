@@ -55,7 +55,7 @@ targets:
       properties:
         CFBundleDisplayName: Usage
         CFBundleIconFile: UsageDark.icns
-        CFBundleVersion: "9"
+        CFBundleVersion: "10"
         CFBundleName: Usage
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
@@ -65,11 +65,13 @@ targets:
     platform: macOS
     sources:
       - Sources/CodexUsageWidget
+      - path: Assets/codex-usage.svg
+        buildPhase: resources
     info:
       path: Widget-Info.plist
       properties:
         CFBundleDisplayName: Usage
-        CFBundleVersion: "9"
+        CFBundleVersion: "10"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     dependencies:

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import WidgetKit
 import UsageCore
@@ -81,6 +82,9 @@ struct CodexUsageWidget: Widget {
 }
 
 private struct UsageWidgetView: View {
+    private static let logo = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
+        .flatMap { NSImage(contentsOf: $0) }
+
     @Environment(\.widgetFamily) private var family
     let entry: UsageEntry
     var body: some View {
@@ -177,7 +181,15 @@ private struct UsageWidgetView: View {
     }
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            if let logo = Self.logo {
+                Image(nsImage: logo)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 13, height: 13)
+                    .foregroundStyle(.primary)
+                    .accessibilityHidden(true)
+            }
             Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
             if entry.accounts.count > 1 {
                 Text("\(min(entry.accounts.count, 3)) of \(entry.accounts.count) accounts")
