@@ -146,14 +146,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let manage = NSMenu()
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             if let snapshot = profile.snapshot {
-                let summary = bankedResetSummary(snapshot.bankedResetCount)
-                header.attributedTitle = NSAttributedString(string: "\(profile.label)    \(summary)", attributes: [
-                    .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor
+                let font = NSFont.menuFont(ofSize: 0)
+                let title = NSMutableAttributedString(string: "\(profile.label)    ", attributes: [
+                    .font: font, .foregroundColor: NSColor.labelColor
                 ])
-                let value = NSMutableAttributedString(attributedString: header.attributedTitle!)
-                value.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor,
-                                   range: NSRange(location: (profile.label + "    ").utf16.count, length: summary.utf16.count))
-                header.attributedTitle = value
+                if let credits = accountCreditSummary(snapshot) {
+                    title.append(NSAttributedString(string: "\(credits) • ", attributes: [
+                        .font: font, .foregroundColor: NSColor.tertiaryLabelColor
+                    ]))
+                }
+                let resetColor = snapshot.hasBankedResetExpiringSoon() ? NSColor.systemRed : NSColor.tertiaryLabelColor
+                title.append(NSAttributedString(string: resetSummary(snapshot.bankedResetCount), attributes: [
+                    .font: font, .foregroundColor: resetColor
+                ]))
+                header.attributedTitle = title
             }
             header.submenu = manage
             menu.addItem(header)
@@ -311,9 +317,19 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return !balances.isEmpty && balances.allSatisfy { $0 == 0 }
     }
 
-    private func bankedResetSummary(_ count: Int?) -> String {
-        guard let count, count >= 0 else { return "Banked resets unavailable" }
-        return "\(count) banked reset\(count == 1 ? "" : "s")"
+    private func resetSummary(_ count: Int?) -> String {
+        guard let count, count >= 0 else { return "Resets unavailable" }
+        return "\(count) reset\(count == 1 ? "" : "s")"
+    }
+
+    private func accountCreditSummary(_ snapshot: Snapshot) -> String? {
+        if snapshot.unlimitedCredits == true { return "Unlimited credits" }
+        guard let balance = snapshot.creditBalance,
+              let decimal = Decimal(string: balance, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 2
+        return "\(formatter.string(from: NSDecimalNumber(decimal: decimal)) ?? balance) \(decimal == 1 ? "credit" : "credits")"
     }
 
     private func updateIcon() {

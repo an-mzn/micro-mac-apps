@@ -7,6 +7,24 @@ final class UsageCoreTests: XCTestCase {
     private var storage: Storage!
     private var client: Client!
 
+    func testBankedResetWarningUsesFutureExpirationsWithin72Hours() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let deadline = now.addingTimeInterval(72 * 60 * 60)
+        let payload = """
+        {"rateLimitResetCredits":{"availableCount":3,"credits":[
+            {"expiresAt":1699999999},{"expiresAt":null},{"expiresAt":1700259200}
+        ]}}
+        """
+        let limits = try JSONDecoder().decode(Limits.self, from: Data(payload.utf8))
+        let snapshot = Snapshot(windows: [], bankedResetCount: limits.bankedResetCount,
+                                bankedResetExpirations: limits.bankedResetExpirations)
+
+        XCTAssertTrue(snapshot.hasBankedResetExpiringSoon(now: now))
+        XCTAssertFalse(snapshot.hasBankedResetExpiringSoon(now: now.addingTimeInterval(-1)))
+        XCTAssertFalse(snapshot.hasBankedResetExpiringSoon(now: deadline))
+        XCTAssertFalse(Snapshot(windows: [], bankedResetCount: 3).hasBankedResetExpiringSoon(now: now))
+    }
+
     override func setUpWithError() throws {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
             .appendingPathComponent(UUID().uuidString)

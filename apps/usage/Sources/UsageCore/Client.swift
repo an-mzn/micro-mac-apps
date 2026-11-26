@@ -84,7 +84,8 @@ public struct Client {
                 throw UsageError.rejected
             }
             return (identity, Snapshot(windows: limits.windows, creditBalance: limits.creditBalance,
-                                       unlimitedCredits: limits.unlimitedCredits, bankedResetCount: limits.bankedResetCount))
+                                       unlimitedCredits: limits.unlimitedCredits, bankedResetCount: limits.bankedResetCount,
+                                       bankedResetExpirations: limits.bankedResetExpirations))
         }
     }
 

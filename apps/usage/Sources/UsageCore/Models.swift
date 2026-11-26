@@ -61,7 +61,12 @@ public struct Window: Codable, Equatable {
 
 public struct Limits: Decodable {
     struct ResetCredits: Decodable {
+        struct Credit: Decodable {
+            let expiresAt: Double?
+        }
+
         let availableCount: Int
+        let credits: [Credit]?
     }
 
     struct Bucket: Decodable {
@@ -87,6 +92,12 @@ public struct Limits: Decodable {
     let rateLimitResetCredits: ResetCredits?
 
     public var bankedResetCount: Int? { rateLimitResetCredits?.availableCount }
+
+    public var bankedResetExpirations: [Date]? {
+        rateLimitResetCredits?.credits?.compactMap { credit in
+            credit.expiresAt.map(Date.init(timeIntervalSince1970:))
+        }
+    }
 
     public var creditBalance: String? {
         if let credits = rateLimits?.credits ?? rateLimitsByLimitId?["codex"]?.credits {
@@ -126,14 +137,23 @@ public struct Snapshot: Codable, Equatable {
     public let creditBalance: String?
     public let unlimitedCredits: Bool?
     public let bankedResetCount: Int?
+    public let bankedResetExpirations: [Date]?
 
     public init(at: Date = Date(), windows: [Window], creditBalance: String? = nil,
-                unlimitedCredits: Bool? = nil, bankedResetCount: Int? = nil) {
+                unlimitedCredits: Bool? = nil, bankedResetCount: Int? = nil,
+                bankedResetExpirations: [Date]? = nil) {
         self.at = at
         self.windows = windows
         self.creditBalance = creditBalance
         self.unlimitedCredits = unlimitedCredits
         self.bankedResetCount = bankedResetCount
+        self.bankedResetExpirations = bankedResetExpirations
+    }
+
+    public func hasBankedResetExpiringSoon(now: Date = Date()) -> Bool {
+        guard let count = bankedResetCount, count > 0 else { return false }
+        let deadline = now.addingTimeInterval(72 * 60 * 60)
+        return bankedResetExpirations?.contains { $0 > now && $0 <= deadline } == true
     }
 
     public func due(interval: TimeInterval, now: Date = Date()) -> Bool {
