@@ -54,7 +54,27 @@ private struct UsageProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void) { completion(read()) }
     func getTimeline(in context: Context, completion: @escaping (Timeline<UsageEntry>) -> Void) {
         let entry = read()
-        completion(Timeline(entries: [entry], policy: .never))
+        let horizon = entry.date.addingTimeInterval(12 * 3600)
+        var dates = Set<Date>()
+        var hasLaterChanges = false
+        for account in entry.accounts.prefix(3) {
+            for reset in [account.fiveHour?.reset, account.weekly?.reset].compactMap({ $0 }) {
+                var boundary = reset.addingTimeInterval(-900)
+                if boundary > horizon {
+                    hasLaterChanges = true
+                    let steps = ceil(boundary.timeIntervalSince(horizon) / 1800)
+                    boundary = boundary.addingTimeInterval(-steps * 1800)
+                }
+                while boundary > entry.date {
+                    dates.insert(boundary)
+                    boundary = boundary.addingTimeInterval(-1800)
+                }
+            }
+        }
+        let updates = dates.sorted().map {
+            UsageEntry(date: $0, accounts: entry.accounts, refreshed: entry.refreshed, status: entry.status)
+        }
+        completion(Timeline(entries: [entry] + updates, policy: hasLaterChanges ? .after(horizon) : .never))
     }
     private func read() -> UsageEntry {
         guard let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
@@ -193,6 +213,12 @@ private struct UsageWidgetView: View {
             Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
         }
     }
+    private func resetTimeLeft(_ reset: Date) -> String {
+        let seconds = max(0, reset.timeIntervalSince(entry.date))
+        let halfHours = Int(ceil(seconds / 1800 - 0.5))
+        return halfHours.isMultiple(of: 2) ? "\(halfHours / 2)h" : "\(halfHours / 2).5h"
+    }
+
     @ViewBuilder
     private func compactAllowance(_ allowance: Allowance?, title: String) -> some View {
         if let allowance {
@@ -206,7 +232,7 @@ private struct UsageWidgetView: View {
                 if let reset = allowance.reset {
                     HStack(spacing: 2) {
                         Image(systemName: "arrow.clockwise").font(.system(size: 7, weight: .medium))
-                        Text(reset, style: .relative).lineLimit(1).minimumScaleFactor(0.75)
+                        Text(resetTimeLeft(reset)).lineLimit(1).minimumScaleFactor(0.75)
                     }
                     .font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                 }
@@ -240,7 +266,7 @@ private struct UsageWidgetView: View {
                 HStack(spacing: 2) {
                     if let reset = allowance.reset {
                         Text("Resets in")
-                        Text(reset, style: .relative).lineLimit(1).minimumScaleFactor(0.75)
+                        Text(resetTimeLeft(reset)).lineLimit(1).minimumScaleFactor(0.75)
                     } else {
                         Text("Reset time unavailable").lineLimit(1).minimumScaleFactor(0.75)
                     }
