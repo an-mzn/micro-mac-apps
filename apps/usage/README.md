@@ -4,9 +4,9 @@ A native menu bar app for comparing ChatGPT-backed Codex allowance across accoun
 
 ## Install and connect
 
-Build **Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package targets macOS 14 or later.
+Build **Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build uses your Apple Development certificate and is unnotarized. The package targets macOS 14 or later.
 
-1. Open the menu and choose **Add Account…**. Enter a label such as Personal.
+1. Open **Settings → Accounts** and choose **Add Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
 3. Repeat with a different label for the second account or workspace. Device code authorization must be enabled for the account and allowed by its workspace. If necessary, enable it in ChatGPT security settings.
 
@@ -28,13 +28,18 @@ Codex stores each profile’s authentication inside its own private `CODEX_HOME`
 
 ## Build and test
 
-Run from this project directory on macOS with Xcode, XcodeGen, and the matching Apple Development signing identity installed. The signed app, including its WidgetKit extension, is written to `dist/`. The optional argument sets the output directory. Override the default signing identity SHA-1 with `USAGE_SIGNING_IDENTITY` if needed. XcodeGen can be installed with `brew install xcodegen`.
+Install Xcode and XcodeGen (`brew install xcodegen`). In **Xcode → Settings → Accounts**, sign in with your Apple Account, select your team, then use **Manage Certificates** to create an **Apple Development** certificate. A free Personal Team is sufficient for a local build.
+
+From the repository root, run:
 
 ```sh
-./build.sh
+cd apps/usage
+security find-identity -v -p codesigning
+USAGE_SIGNING_IDENTITY='<SHA-1 shown next to your Apple Development certificate>' ./build.sh
+open dist/Usage.app
 ```
 
-The widget and menu app share cached settings in the macOS application group `7FVL4J2UZ9.com.an-mzn.codex-usage`. Profile authentication remains isolated under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. On first launch after upgrading, the previous settings file is copied into the shared container automatically. The local build is signed with the matching Apple Development identity because macOS only permits the signed team to use this team-prefixed group identifier. Team-prefixed app groups are macOS-only and don’t require a paid Apple Developer Program membership or a provisioning profile. For a different signing team, replace `7FVL4J2UZ9` in the group identifier in the app, widget, and both entitlements files.
+The script writes the signed app and its WidgetKit extension to `dist/Usage.app`. Pass an output directory as the first argument to build elsewhere. It reads the certificate’s team ID and configures the same team-prefixed macOS app group in the app and widget. No source edits are needed. Profile authentication stays under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`; the shared group holds cached settings and allowance data.
 
 Eight Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, automatic 5-hour and weekly comparison, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
 

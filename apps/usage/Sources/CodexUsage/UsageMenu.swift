@@ -4,7 +4,8 @@ import UsageCore
 import WidgetKit
 
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
-    private let appGroup = "7FVL4J2UZ9.com.an-mzn.codex-usage"
+    private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
+        ?? "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
     private var config = Configuration()
     private var widgetReloadPending = false
