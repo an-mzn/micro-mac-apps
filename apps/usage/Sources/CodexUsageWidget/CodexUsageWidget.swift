@@ -76,7 +76,7 @@ struct CodexUsageWidget: Widget {
         }
         .configurationDisplayName("Usage")
         .description("See your remaining 5-hour and weekly Codex allowance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
@@ -84,40 +84,93 @@ private struct UsageWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: UsageEntry
     var body: some View {
-        Group { if family == .systemSmall { small } else { medium } }
+        Group {
+            switch family {
+            case .systemSmall: small
+            case .systemMedium: medium
+            default: large
+            }
+        }
             .fontDesign(.rounded).foregroundStyle(.primary)
     }
     private var small: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             header
-            if let account = entry.accounts.first(where: \.hasUsage) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let fiveHour = account.fiveHour { gauge(fiveHour) }
-                    if let weekly = account.weekly { gauge(weekly) }
+            if let account = entry.accounts.first {
+                HStack(spacing: 9) {
+                    SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 54)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(account.label).font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                        compactAllowance(account.fiveHour, title: "5h")
+                        compactAllowance(account.weekly, title: "Wk")
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 0); footer
             } else {
-                Spacer(minLength: 0); Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
         }.padding(14)
     }
     private var medium: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             header
-            if entry.accounts.contains(where: \.hasUsage) {
-                HStack(alignment: .top, spacing: 14) {
-                    ForEach(entry.accounts.filter(\.hasUsage)) { account in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(account.label).font(.caption.weight(.semibold)).lineLimit(1)
-                            if let fiveHour = account.fiveHour { gauge(fiveHour) }
-                            if let weekly = account.weekly { gauge(weekly) }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
+            if !entry.accounts.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(Array(entry.accounts.prefix(3))) { account in
+                        HStack(spacing: 7) {
+                            Text(account.label)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .lineLimit(1).minimumScaleFactor(0.75)
+                                .frame(width: 55, alignment: .leading)
+                            SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 32, lineWidth: 4)
+                            compactAllowance(account.fiveHour, title: "5h")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            compactAllowance(account.weekly, title: "Wk")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(height: 30)
+                        if account.id != entry.accounts.prefix(3).last?.id {
+                            Rectangle().fill(.quaternary).frame(height: 1)
+                        }
                     }
                 }
-                Spacer(minLength: 0); footer
+                Spacer(minLength: 0)
+                footer
             } else {
-                Spacer(minLength: 0); Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+        }.padding(12)
+    }
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            header
+            if !entry.accounts.isEmpty {
+                VStack(spacing: 3) {
+                    ForEach(Array(entry.accounts.prefix(3))) { account in
+                        HStack(spacing: 10) {
+                            Text(account.label)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .lineLimit(1).minimumScaleFactor(0.75)
+                                .frame(width: 58, alignment: .leading)
+                            allowanceColumn(account.fiveHour, title: "5 hours")
+                            allowanceColumn(account.weekly, title: "Weekly")
+                        }
+                        .frame(height: 76)
+                        if account.id != entry.accounts.prefix(3).last?.id {
+                            Rectangle().fill(.quaternary).frame(height: 1)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+                footer
+            } else {
+                Spacer(minLength: 0)
+                Text(entry.status ?? "No usage available").font(.callout).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
         }.padding(16)
@@ -126,32 +179,72 @@ private struct UsageWidgetView: View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
-            if entry.accounts.count > 1 { Text("\(entry.accounts.count) accounts").font(.caption2).foregroundStyle(.secondary) }
+            if entry.accounts.count > 1 {
+                Text("\(min(entry.accounts.count, 3)) of \(entry.accounts.count) accounts")
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
     }
-    private func gauge(_ allowance: Allowance) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle().stroke(.quaternary, lineWidth: 5)
-                Circle().trim(from: 0, to: CGFloat(allowance.remaining) / 100)
-                    .stroke(gaugeColor(allowance.remaining), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Image(systemName: allowance.title == "Week" ? "calendar" : "clock")
-                    .font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-            }.frame(width: 31, height: 31)
+    @ViewBuilder
+    private func compactAllowance(_ allowance: Allowance?, title: String) -> some View {
+        if let allowance {
             VStack(alignment: .leading, spacing: 1) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(allowance.title).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-                    Text("\(allowance.remaining)%").font(.system(.body, design: .rounded, weight: .semibold).monospacedDigit())
+                HStack(spacing: 3) {
+                    Text(title).font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("\(allowance.remaining)%")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 if let reset = allowance.reset {
-                    Text(reset, style: .relative).font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary).lineLimit(1)
+                    HStack(spacing: 2) {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 7, weight: .medium))
+                        Text(reset, style: .relative).lineLimit(1).minimumScaleFactor(0.75)
+                    }
+                    .font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 0)
-        }.accessibilityElement(children: .ignore)
-         .accessibilityLabel("\(allowance.title), \(allowance.remaining) percent remaining")
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 3) {
+                    Text(title).font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("—").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                }
+                Text("Unavailable").font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                    .lineLimit(1).minimumScaleFactor(0.75)
+            }
+        }
+    }
+    private func allowanceColumn(_ allowance: Allowance?, title: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+            if let allowance {
+                Text("\(allowance.remaining)% left")
+                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.quaternary)
+                        Capsule().fill(gaugeColor(allowance.remaining))
+                            .frame(width: proxy.size.width * CGFloat(allowance.remaining) / 100)
+                    }
+                }.frame(height: 4)
+                HStack(spacing: 2) {
+                    if let reset = allowance.reset {
+                        Text("Resets in")
+                        Text(reset, style: .relative).lineLimit(1).minimumScaleFactor(0.75)
+                    } else {
+                        Text("Reset time unavailable").lineLimit(1).minimumScaleFactor(0.75)
+                    }
+                }
+                .font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+            } else {
+                Text("—").font(.system(size: 17, weight: .semibold, design: .rounded)).foregroundStyle(.tertiary)
+                Capsule().fill(.quaternary).frame(height: 4)
+                Text("No limit reported").font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     private var footer: some View {
         HStack {
@@ -165,6 +258,76 @@ private struct UsageWidgetView: View {
     }
     private func gaugeColor(_ remaining: Int) -> Color {
         if remaining <= 15 { return .orange }; if remaining <= 35 { return .yellow }; return .green
+    }
+}
+
+private struct SplitAllowanceRing: View {
+    let fiveHour: Allowance?
+    let weekly: Allowance?
+    let size: CGFloat
+    var lineWidth: CGFloat = 5
+
+    var body: some View {
+        ZStack {
+            allowanceArc(from: 180, to: 360).stroke(.quaternary,
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            allowanceArc(from: 0, to: 180).stroke(.quaternary,
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            if let fiveHour {
+                allowanceArc(from: 180, to: 180 + 180 * progress(fiveHour.remaining))
+                    .stroke(allowanceColor(fiveHour.remaining), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            }
+            if let weekly {
+                allowanceArc(from: 0, to: 180 * progress(weekly.remaining))
+                    .stroke(allowanceColor(weekly.remaining), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            }
+            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                .font(.system(size: max(9, size * 0.2), weight: .semibold)).foregroundStyle(.secondary)
+            Image(systemName: "clock")
+                .font(.system(size: max(6, size * 0.14), weight: .medium)).foregroundStyle(.secondary)
+                .offset(y: -size * 0.22)
+            Image(systemName: "calendar")
+                .font(.system(size: max(6, size * 0.13), weight: .medium)).foregroundStyle(.secondary)
+                .offset(y: size * 0.22)
+        }
+        .frame(width: size, height: size)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ringAccessibilityLabel)
+    }
+
+    private var ringAccessibilityLabel: String {
+        let five = fiveHour.map { "5-hour allowance \($0.remaining) percent" } ?? "5-hour allowance unavailable"
+        let week = weekly.map { "weekly allowance \($0.remaining) percent" } ?? "weekly allowance unavailable"
+        return "\(five), \(week)"
+    }
+
+    private func progress(_ remaining: Int) -> Double {
+        Double(min(100, max(0, remaining))) / 100
+    }
+
+    private func allowanceColor(_ remaining: Int) -> Color {
+        if remaining <= 15 { return .orange }
+        if remaining <= 35 { return .yellow }
+        return .green
+    }
+
+    private func allowanceArc(from start: Double, to end: Double) -> RingArc {
+        RingArc(start: start, end: end)
+    }
+}
+
+private struct RingArc: Shape {
+    let start: Double
+    let end: Double
+
+    func path(in rect: CGRect) -> Path {
+        let inset = rect.width * 0.08
+        let radius = min(rect.width, rect.height) / 2 - inset
+        var path = Path()
+        guard radius > 0, end > start else { return path }
+        path.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: radius,
+                    startAngle: .degrees(start), endAngle: .degrees(end), clockwise: true)
+        return path
     }
 }
 
