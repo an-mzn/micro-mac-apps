@@ -146,7 +146,18 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func info(_ title: String, in menu: NSMenu) {
-        menu.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+        let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let label = NSTextField(labelWithString: title)
+        label.font = .menuFont(ofSize: 0)
+        label.textColor = .labelColor
+        label.sizeToFit()
+        let inset: CGFloat = 14
+        let height = max(22, label.frame.height + 4)
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: label.frame.width + 2 * inset, height: height))
+        label.setFrameOrigin(NSPoint(x: inset, y: (height - label.frame.height) / 2))
+        row.addSubview(label)
+        entry.view = row
+        menu.addItem(entry)
     }
 
     private func action(_ title: String, _ selector: Selector, in menu: NSMenu, id: UUID? = nil, key: String = "") {

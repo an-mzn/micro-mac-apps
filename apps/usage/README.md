@@ -4,7 +4,7 @@ A native menu bar app for comparing ChatGPT-backed Codex allowance across accoun
 
 ## Install and connect
 
-Extract `Codex Usage.zip`, move **Codex Usage.app** to Applications, and open it. Look for the cloud refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package is arm64 and targets macOS 13 or later. It was exercised on macOS 27.2.1.
+Build **Codex Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the cloud refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package is arm64 and targets macOS 13 or later. It was exercised on macOS 27.2.1.
 
 1. Open the menu and choose **Add Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
@@ -26,7 +26,7 @@ Codex stores each profile’s authentication inside its own private `CODEX_HOME`
 
 ## Build and test
 
-Run from this project directory with the Xcode command-line tools installed. The ZIP and app are written to `dist/`. The optional argument sets the output directory. The build verifies the signature both before packaging and after extracting the ZIP.
+Run from this project directory with the Xcode command-line tools installed. The signed app is written to `dist/`. The optional argument sets the output directory.
 
 ```sh
 swift test -c release

@@ -15,13 +15,8 @@ sips -s format png -z 80 80 Assets/codex-refresh.svg \
     --out "$app/Contents/Resources/codex-refresh.png" >/dev/null
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"
-ditto -c -k --norsrc --noextattr --noqtn --keepParent "$app" "$staging/Codex Usage.zip"
-mkdir "$staging/extracted"
-ditto -x -k "$staging/Codex Usage.zip" "$staging/extracted"
-codesign --verify --strict "$staging/extracted/Codex Usage.app"
 if [[ -e "$out/Codex Usage.app" ]]; then
     rm -rf "$out/Codex Usage.app"
 fi
 mv "$app" "$out/Codex Usage.app"
-mv -f "$staging/Codex Usage.zip" "$out/Codex Usage.zip"
-printf '%s\n' "$out/Codex Usage.zip"
+printf '%s\n' "$out/Codex Usage.app"
