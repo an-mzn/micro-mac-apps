@@ -133,6 +133,7 @@ public struct Configuration: Codable, Equatable {
     public var menuWindow: String?
     public var menuWeeklyWindow: String?
     public var menuShowsMostAvailable: Bool?
+    public var resetDisplayTimeLeft: Bool?
     public init() {}
 
     public var mostAvailable: (profile: Profile, window: Window)? {
@@ -143,6 +144,24 @@ public struct Configuration: Codable, Equatable {
             let window = candidates.first { $0.minutes == 300 } ?? candidates.first { $0.minutes == 10_080 }
             return window.map { (profile, $0) }
         }.max { $0.window.remaining < $1.window.remaining }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case profiles, lastRefreshed, minutes, binary, menuProfile, menuWindow, menuWeeklyWindow
+        case menuShowsMostAvailable, resetDisplayTimeLeft
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        profiles = try values.decodeIfPresent([Profile].self, forKey: .profiles) ?? []
+        lastRefreshed = try values.decodeIfPresent(Date.self, forKey: .lastRefreshed)
+        minutes = try values.decodeIfPresent(Int.self, forKey: .minutes) ?? 15
+        binary = try values.decodeIfPresent(String.self, forKey: .binary)
+        menuProfile = try values.decodeIfPresent(UUID.self, forKey: .menuProfile)
+        menuWindow = try values.decodeIfPresent(String.self, forKey: .menuWindow)
+        menuWeeklyWindow = try values.decodeIfPresent(String.self, forKey: .menuWeeklyWindow)
+        menuShowsMostAvailable = try values.decodeIfPresent(Bool.self, forKey: .menuShowsMostAvailable)
+        resetDisplayTimeLeft = try values.decodeIfPresent(Bool.self, forKey: .resetDisplayTimeLeft)
     }
 }
 

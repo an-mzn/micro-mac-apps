@@ -27,7 +27,7 @@ targets:
     platform: macOS
     sources:
       - Sources/CodexUsage
-      - path: Assets/codex-refresh.svg
+      - path: Assets/codex-usage.svg
         buildPhase: resources
     dependencies:
       - target: UsageCore

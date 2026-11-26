@@ -12,6 +12,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private var menuIsOpen = false
     private var settingsWindow: NSWindow?
     private weak var settingsTabs: NSTabViewController?
+    private weak var accountSettingsStack: NSStackView?
     private let queue: OperationQueue = {
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 2
@@ -69,7 +70,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { config = try storage.load() }
         catch { storageProblem = true; loadFailed = true }
-        let icon = Bundle.main.url(forResource: "codex-refresh", withExtension: "svg")
+        let icon = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
         icon?.size = NSSize(width: 18, height: 18)
         item.button?.image = icon
@@ -114,10 +115,21 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         if storageProblem { info("Could not read or save profile settings", in: menu) }
         if cli == nil { info("CLI unavailable · Select a binary in Settings", in: menu) }
         if config.profiles.isEmpty { info("No accounts connected", in: menu) }
+        if hasNoUsageLeft { info("Cooked – no AI usage left", in: menu, color: .systemOrange) }
         for profile in config.profiles {
             menu.addItem(.separator())
             let manage = NSMenu()
+            let summary = profile.snapshot == nil ? nil : accountAllowanceSummary(profile)
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
+            if let summary {
+                header.attributedTitle = NSAttributedString(string: "\(profile.label)    \(summary)", attributes: [
+                    .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor
+                ])
+                let value = NSMutableAttributedString(attributedString: header.attributedTitle!)
+                value.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor,
+                                   range: NSRange(location: (profile.label + "    ").count, length: summary.count))
+                header.attributedTitle = value
+            }
             header.submenu = manage
             menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
@@ -164,7 +176,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let remaining = NSTextField(labelWithString: "\(window.remaining)% left")
         remaining.font = .menuFont(ofSize: 0)
         remaining.textColor = .labelColor
-        let reset = NSTextField(labelWithString: window.reset.map(dateText) ?? "")
+        let reset = NSTextField(labelWithString: window.reset.map(resetText) ?? "")
         reset.font = .menuFont(ofSize: 0)
         reset.textColor = .secondaryLabelColor
         reset.alignment = .right
@@ -209,7 +221,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         title.alignment = .left
         let last = NSTextField(labelWithString: config.lastRefreshed.map { "Last refreshed \(dateText($0))" } ?? "Not refreshed yet")
         last.font = .menuFont(ofSize: 0)
-        last.textColor = .secondaryLabelColor
+        last.textColor = .tertiaryLabelColor
         last.alignment = .right
         let row = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
         row.addSubview(title)
@@ -249,6 +261,39 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         date.formatted(date: .abbreviated, time: .shortened)
     }
 
+    private func resetText(_ date: Date) -> String {
+        guard config.resetDisplayTimeLeft == true else { return dateText(date) }
+        let seconds = max(0, Int(date.timeIntervalSinceNow))
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours >= 24 { return "\(hours / 24)d \(hours % 24)h until reset" }
+        if hours > 0 { return "\(hours)h \(minutes)m until reset" }
+        return "\(max(1, minutes))m until reset"
+    }
+
+    private var hasNoUsageLeft: Bool {
+        let balances = config.profiles.compactMap { profile -> Int? in
+            let windows = profile.snapshot?.windows ?? []
+            let primary = windows.filter { $0.bucketID == "codex" }
+            let candidates = primary.isEmpty ? windows : primary
+            let relevant = candidates.filter { $0.minutes == 300 || $0.minutes == 10_080 }
+            return relevant.map(\.remaining).max()
+        }
+        return !balances.isEmpty && balances.allSatisfy { $0 == 0 }
+    }
+
+    private func accountAllowanceSummary(_ profile: Profile) -> String {
+        let windows = profile.snapshot?.windows ?? []
+        let primary = windows.filter { $0.bucketID == "codex" }
+        let candidates = primary.isEmpty ? windows : primary
+        let current = candidates.first { $0.minutes == 300 } ?? candidates.first { $0.minutes == 10_080 }
+        let weekly = candidates.first { $0.minutes == 10_080 }
+        var values = [String]()
+        if let current { values.append("\(current.minutes == 300 ? "5h" : "Wk") \(current.remaining)%") }
+        if let weekly, current?.id != weekly.id { values.append("Wk \(weekly.remaining)%") }
+        return values.joined(separator: " · ")
+    }
+
     private func updateIcon() {
         let mostAvailable = config.menuShowsMostAvailable == true ? config.mostAvailable : nil
         let profile = mostAvailable?.profile ?? config.profiles.first { $0.id == config.menuProfile }
@@ -274,9 +319,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         try storage.save(next)
         config = next
         storageProblem = false
-        if let settingsTabs, settingsTabs.tabView.tabViewItems.count > 1 {
-            settingsTabs.tabView.tabViewItems[1].viewController = pageController(title: "Accounts", view: accountSettingsPage())
-        }
+        rebuildAccountSettingsPage()
         WidgetCenter.shared.reloadAllTimelines()
         updateIcon()
         if menuIsOpen { menu.update() }
@@ -728,9 +771,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         binary.setAccessibilityLabel("Codex executable path")
         let choose = NSButton(title: "Choose Executable…", target: self, action: #selector(chooseBinary(_:)))
         choose.cell?.representedObject = binary
+        let resetDisplay = NSButton(checkboxWithTitle: "Show time until reset", target: self, action: #selector(changeResetDisplay(_:)))
+        resetDisplay.state = config.resetDisplayTimeLeft == true ? .on : .off
         let general = settingsPage([
             fieldRow("Background refresh", interval),
             fieldRow("Menu bar display", selection),
+            resetDisplay,
             launch,
             NSTextField(labelWithString: "Codex executable"),
             binary,
@@ -796,6 +842,31 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func accountSettingsPage() -> NSView {
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 16
+        accountSettingsStack = stack
+        fillAccountSettings(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let container = NSView()
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: container.bottomAnchor, constant: -24)
+        ])
+        return container
+    }
+
+    private func rebuildAccountSettingsPage() {
+        guard let stack = accountSettingsStack else { return }
+        stack.arrangedSubviews.forEach { view in stack.removeArrangedSubview(view); view.removeFromSuperview() }
+        fillAccountSettings(stack)
+    }
+
+    private func fillAccountSettings(_ stack: NSStackView) {
         let intro = NSTextField(labelWithString: "Manage connected ChatGPT accounts and refresh their usage.")
         intro.textColor = .secondaryLabelColor
         let refresh = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
@@ -813,7 +884,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             column.orientation = .vertical
             column.alignment = .leading
             column.spacing = 3
+            let orderUp = profileOrderButton("↑", id: profile.id, delta: -1)
+            orderUp.isEnabled = config.profiles.first?.id != profile.id
+            let orderDown = profileOrderButton("↓", id: profile.id, delta: 1)
+            orderDown.isEnabled = config.profiles.last?.id != profile.id
             let actions = NSStackView(views: [
+                orderUp, orderDown,
                 profileButton("Rename…", selector: #selector(renameProfileButton(_:)), id: profile.id),
                 profileButton("Details…", selector: #selector(accountDetailsForButton(_:)), id: profile.id),
                 profileButton("Reauthenticate…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id),
@@ -839,7 +915,26 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             empty.textColor = .secondaryLabelColor
             content.append(empty)
         }
-        return settingsPage(content)
+        content.forEach { stack.addArrangedSubview($0) }
+    }
+
+    private func profileOrderButton(_ title: String, id: UUID, delta: Int) -> NSButton {
+        let button = profileButton(title, selector: #selector(moveProfile(_:)), id: id)
+        button.tag = delta
+        button.setAccessibilityLabel(delta < 0 ? "Move account up" : "Move account down")
+        return button
+    }
+
+    @objc private func moveProfile(_ sender: NSButton) {
+        guard let id = sender.cell?.representedObject as? UUID,
+              let index = config.profiles.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + sender.tag
+        guard config.profiles.indices.contains(destination) else { return }
+        change { $0.profiles.swapAt(index, destination) }
+    }
+
+    @objc private func changeResetDisplay(_ sender: NSButton) {
+        change { $0.resetDisplayTimeLeft = sender.state == .on }
     }
 
     private func profileButton(_ title: String, selector: Selector, id: UUID) -> NSButton {

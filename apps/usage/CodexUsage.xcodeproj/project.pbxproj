@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */ = {isa = PBXBuildFile; fileRef = 483FFECF96BC256973FF108F /* codex-usage.svg */; };
 		2E785F238E3D570BB34C4846 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
 		4757B1560A531E6E905CC2D8 /* UsageMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42C7DF564F33A6868893451 /* UsageMenu.swift */; };
 		5A0FAE2926445B13D14DA707 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -17,7 +18,6 @@
 		9B23643E492041D9B2FE8487 /* CodexUsageWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A98E08F7F102EA0D9CDCC94F /* CodexUsageWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9CD55AB3218C473F7C759F55 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
 		B0733A38D675E229AF8CC09B /* CodexUsageWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EAC0B0A57CCE21DC78BAC38 /* CodexUsageWidget.swift */; };
-		B23151CF32D5413EAA621092 /* codex-refresh.svg in Resources */ = {isa = PBXBuildFile; fileRef = C46E31D9A0863CD8CFDE6EFE /* codex-refresh.svg */; };
 		BAEE1554BC5C925F3B5A191F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E386A19ADA12E73A4B329453 /* main.swift */; };
 		D12859F20843D875373CCEB0 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E57E17D635ED0C7E7DD52F1A /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A99A6A259A28AFA09539FA3 /* Client.swift */; };
@@ -93,13 +93,13 @@
 /* Begin PBXFileReference section */
 		2A99A6A259A28AFA09539FA3 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
 		2D493C25C602897BC1EEC4FF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		483FFECF96BC256973FF108F /* codex-usage.svg */ = {isa = PBXFileReference; path = "codex-usage.svg"; sourceTree = "<group>"; };
 		7EAC0B0A57CCE21DC78BAC38 /* CodexUsageWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageWidget.swift; sourceTree = "<group>"; };
 		9187E8A074F560C613ED393F /* UsageCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = UsageCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		A98E08F7F102EA0D9CDCC94F /* CodexUsageWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexUsageWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ABAB99EA47A02B6120B7365E /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 		BCC07F1E75534D479BFD25B6 /* CodexUsage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodexUsage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C02714327538B991E2F2F7FA /* UsageCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCoreTests.swift; sourceTree = "<group>"; };
-		C46E31D9A0863CD8CFDE6EFE /* codex-refresh.svg */ = {isa = PBXFileReference; path = "codex-refresh.svg"; sourceTree = "<group>"; };
 		E386A19ADA12E73A4B329453 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F42C7DF564F33A6868893451 /* UsageMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMenu.swift; sourceTree = "<group>"; };
 		F8D6E0222484CB5755EA1F58 /* UsageCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UsageCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -172,7 +172,7 @@
 		A84BF008D1A7D726FEEEE5CD /* Assets */ = {
 			isa = PBXGroup;
 			children = (
-				C46E31D9A0863CD8CFDE6EFE /* codex-refresh.svg */,
+				483FFECF96BC256973FF108F /* codex-usage.svg */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -351,7 +351,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B23151CF32D5413EAA621092 /* codex-refresh.svg in Resources */,
+				198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
