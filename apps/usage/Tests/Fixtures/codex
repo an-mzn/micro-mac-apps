@@ -1,0 +1,82 @@
+#!/usr/bin/python3
+"""Deterministic stdio fixture. Each temporary home supplies its own scenario."""
+import json
+import os
+from pathlib import Path
+import sys
+import time
+
+home = Path(os.environ["CODEX_HOME"])
+assert home.resolve() == Path.cwd().resolve() and home.parent.name == "Profiles"
+assert "OPENAI_API_KEY" not in os.environ and "CODEX_ACCESS_TOKEN" not in os.environ
+assert sys.argv[1:4] == ["app-server", "--listen", "stdio://"]
+assert 'cli_auth_credentials_store="file"' in sys.argv
+(home / "pid").write_text(str(os.getpid()))
+scenario = (home / "scenario").read_text().strip() if (home / "scenario").exists() else "normal"
+
+
+def emit(message):
+    print(json.dumps(message), flush=True)
+
+
+def account():
+    return {"account": {"type": "chatgpt", "email": "same@example.invalid", "planType": "plus",
+                        "workspaceName": "Studio" if scenario == "studio" else None},
+            "workspaceRouting": {"chatgptAccountId": "studio"} if scenario == "studio" else None}
+
+
+refreshed = False
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request["method"]
+    if method == "initialized":
+        continue
+    with (home / "calls").open("a") as calls:
+        calls.write(method + "\n")
+    if method == "initialize":
+        result = {"codexHome": "/wrong/home" if scenario == "wrong-home" else str(home)}
+    elif method == "account/read":
+        if request["params"].get("refreshToken"):
+            assert scenario == "expired"
+            refreshed = True
+        result = {"account": None} if scenario == "signed-out" else account()
+    elif method == "account/login/start":
+        assert request["params"]["type"] == "chatgptDeviceCode"
+        result = {"type": "chatgptDeviceCode", "loginId": "fixture-login",
+                  "userCode": "TEST-CODE", "verificationUrl": "https://auth.openai.com/fixture"}
+        emit({"method": "account/login/completed", "params": {"loginId": "different", "success": False}})
+        if scenario != "login-wait":
+            emit({"method": "account/login/completed", "params": {"loginId": "fixture-login", "success": True}})
+    elif method == "account/login/cancel":
+        result = {"status": "canceled"}
+    elif method == "account/rateLimits/read":
+        if scenario == "expired" and not refreshed:
+            emit({"id": request["id"], "error": {"code": -32603, "message": "401 Unauthorized"}})
+            continue
+        if scenario == "timeout":
+            time.sleep(60)
+        if scenario == "slow":
+            time.sleep(4)
+        if scenario == "malformed":
+            print("{broken", flush=True)
+            continue
+        if scenario == "exit":
+            sys.exit(2)
+        if scenario == "offline":
+            emit({"id": request["id"], "error": {"code": -32603, "message": "network connection failed"}})
+            continue
+        main = {"usedPercent": 23, "resetsAt": int(time.time()) + 3600, "windowDurationMins": 300}
+        result = {
+            "rateLimits": {"primary": main, "secondary": None},
+            "rateLimitsByLimitId": {
+                "codex": {"limitName": "Codex", "primary": main,
+                          "secondary": {"usedPercent": 89, "windowDurationMins": 10080}},
+                "studio": {"limitName": "Studio Meter", "primary": None,
+                           "secondary": {"usedPercent": 40, "windowDurationMins": 43200, "resetsAt": None}}
+            } if scenario == "studio" else None,
+            "accountId": "studio" if scenario == "studio" else None,
+        }
+        emit({"method": "account/rateLimits/updated", "params": {}})
+    else:
+        raise AssertionError(method)
+    emit({"id": request["id"], "result": result})
