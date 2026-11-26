@@ -63,7 +63,7 @@ private struct UsageProvider: TimelineProvider {
             let config = try Storage(root: root).load()
             let accounts = config.profiles.map(AccountReading.init(profile:))
             return UsageEntry(date: .now, accounts: accounts, refreshed: config.lastRefreshed,
-                              status: accounts.isEmpty ? "Add an account in Codex Usage" : nil)
+                              status: accounts.isEmpty ? "Add an account in Usage" : nil)
         } catch { return UsageEntry(date: .now, accounts: [], refreshed: nil, status: "Could not read allowance") }
     }
 }
@@ -74,7 +74,7 @@ struct CodexUsageWidget: Widget {
         StaticConfiguration(kind: kind, provider: UsageProvider()) { entry in
             UsageWidgetView(entry: entry).containerBackground(.background, for: .widget)
         }
-        .configurationDisplayName("Codex Usage")
+        .configurationDisplayName("Usage")
         .description("See your remaining 5-hour and weekly Codex allowance.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
@@ -125,7 +125,7 @@ private struct UsageWidgetView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text("Codex Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
+            Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
             if entry.accounts.count > 1 { Text("\(entry.accounts.count) accounts").font(.caption2).foregroundStyle(.secondary) }
         }
     }

@@ -1,10 +1,10 @@
-# Codex Usage
+# Usage
 
 A native menu bar app for comparing ChatGPT-backed Codex allowance across accounts and workspaces. The menu shows the last successful reading for each profile, including the windows and bucket names returned by Codex.
 
 ## Install and connect
 
-Build **Codex Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package targets macOS 14 or later.
+Build **Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build is ad hoc signed and unnotarized. The package targets macOS 14 or later.
 
 1. Open the menu and choose **Add Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
@@ -18,13 +18,13 @@ The **Codex executable** setting is the path to the Codex command-line program (
 
 Cached readings appear immediately in the menu and widget. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile. The widget supports small and medium macOS widget sizes: the small widget shows the first connected account, and the medium widget shows accounts side by side. Both show the 5-hour and weekly remaining percentage in circular gauges inspired by Apple’s battery rings. Widget updates use the same background refresh cadence and cached values; they do not trigger live account requests.
 
-Use **Refresh All** for an immediate shared refresh. When an automatic refresh is due, the app refreshes eligible accounts together and shows one last-refreshed time. Account emails and workspace details are available under **Settings → Account Details**. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** in the account submenu. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. **Most allowance available** shows the account with the highest remaining percentage, comparing each account’s 5-hour reading or its weekly reading if the 5-hour window is absent. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
+Use **Refresh All** for an immediate shared refresh from the menu or Settings. The menu row shows the last-refreshed time. When an automatic refresh is due, the app refreshes eligible accounts together. Account labels can be renamed from **Settings → Accounts** or the account submenu; each account’s email and workspace context are available from its **Details…** action. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** from account actions. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. **Most allowance available** shows the account with the highest remaining percentage, comparing each account’s 5-hour reading or its weekly reading if the 5-hour window is absent. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
 
 ## Profile storage and removal
 
 Codex stores each profile’s authentication inside its own private `CODEX_HOME` at `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. The app explicitly sets that home for every App Server process, uses Codex’s file credential store, and excludes inherited credential environment variables. The Codex process may also initialize its own runtime state and diagnostics in that home. The tracker’s `settings.json` stores labels, documented account context, preferences, and the latest successful allowance for each profile. It never stores credentials in that file. The app sends no prompts or transcript requests and uses the documented Account API.
 
-**Remove…** in a profile submenu asks for confirmation, cancels and reaps any active refresh, then removes the validated profile directory and its cached reading. To uninstall, turn off launch at login if enabled, quit the menu bar app, and move it to the Trash. Delete the Codex Usage Application Support directory if you also want to discard all tracker profiles and their cached readings.
+**Remove…** in a profile submenu asks for confirmation, cancels and reaps any active refresh, then removes the validated profile directory and its cached reading. To uninstall, turn off launch at login if enabled, quit the menu bar app, and move it to the Trash. Delete `~/Library/Application Support/Codex Usage` if you also want to discard all tracker profiles and cached readings.
 
 ## Build and test
 

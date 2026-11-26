@@ -10,8 +10,8 @@ xcodebuild -project CodexUsage.xcodeproj -scheme CodexUsage -configuration Relea
     -derivedDataPath .xcodebuild CODE_SIGNING_ALLOWED=NO build
 out="${1:-$PWD/dist}"
 mkdir -p "$out"
-app="$out/Codex Usage.app"
-staging="$out/.Codex Usage.app.new"
+app="$out/Usage.app"
+staging="$out/.Usage.app.new"
 rm -rf "$staging"
 ditto .xcodebuild/Build/Products/Release/CodexUsage.app "$staging"
 codesign --force --deep --sign - --entitlements App.entitlements "$staging/Contents/Frameworks/UsageCore.framework"
@@ -21,5 +21,8 @@ codesign --force --sign - --entitlements Widget.entitlements "$staging/Contents/
 codesign --force --deep --sign - --entitlements App.entitlements "$staging"
 if [[ -e "$app" ]]; then rm -rf "$app"; fi
 mv "$staging" "$app"
+if [[ "$out" == "$PWD/dist" && -e "$out/Codex Usage.app" ]]; then
+    rm -rf "$out/Codex Usage.app"
+fi
 codesign --verify --deep --strict "$app"
 printf '%s\n' "$app"

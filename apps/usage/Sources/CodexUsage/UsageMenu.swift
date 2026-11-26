@@ -3,12 +3,13 @@ import ServiceManagement
 import UsageCore
 import WidgetKit
 
-final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSWindowDelegate {
+final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
     private let appGroup = "group.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
     private var config = Configuration()
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let popover = NSPopover()
+    private let menu = NSMenu()
+    private var menuIsOpen = false
     private var settingsWindow: NSWindow?
     private weak var settingsTabs: NSTabViewController?
     private let queue: OperationQueue = {
@@ -70,17 +71,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         catch { storageProblem = true; loadFailed = true }
         let icon = Bundle.main.url(forResource: "codex-refresh", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
-        icon?.size = NSSize(width: 20, height: 20)
+        icon?.size = NSSize(width: 18, height: 18)
         item.button?.image = icon
-            ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Codex Usage")
+            ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeading
-        item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        item.button?.target = self
-        item.button?.action = #selector(showMenu)
-        item.button?.sendAction(on: .leftMouseUp)
-        popover.behavior = .transient
-        popover.animates = false
+        item.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        item.menu = menu
+        menu.delegate = self
         updateIcon()
         let center = NSWorkspace.shared.notificationCenter
         sleepObserver = center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
@@ -111,126 +109,123 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         return .terminateLater
     }
 
-    @objc private func showMenu() {
-        guard let button = item.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-            return
-        }
-        updatePopover()
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        beginRefreshBatch(manual: true)
-    }
-
-    private func updatePopover() {
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 7
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
-        if storageProblem { appendInfo("Could not read or save profile settings", to: stack) }
-        if cli == nil { appendInfo("CLI unavailable · Select a binary in Settings", to: stack) }
-        if config.profiles.isEmpty { appendInfo("No accounts connected", to: stack) }
-        for (index, profile) in config.profiles.enumerated() {
-            if index > 0 { appendDivider(to: stack) }
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        if storageProblem { info("Could not read or save profile settings", in: menu) }
+        if cli == nil { info("CLI unavailable · Select a binary in Settings", in: menu) }
+        if config.profiles.isEmpty { info("No accounts connected", in: menu) }
+        for profile in config.profiles {
+            menu.addItem(.separator())
             let manage = NSMenu()
+            let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
+            header.submenu = manage
+            menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
+            action("Account Details…", #selector(accountDetailsForMenu(_:)), in: manage, id: profile.id)
             action("Reauthenticate…", #selector(reauthenticate(_:)), in: manage, id: profile.id)
             action("Remove…", #selector(remove(_:)), in: manage, id: profile.id)
-            let name = NSTextField(labelWithString: profile.label)
-            name.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
-            name.textColor = .labelColor
-            let chevron = NSButton(image: NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Account actions")!,
-                                   target: self, action: #selector(showAccountActions(_:)))
-            chevron.isBordered = false
-            chevron.setContentHuggingPriority(.required, for: .horizontal)
-            chevron.cell?.representedObject = manage
-            let header = NSStackView(views: [name, NSView(), chevron])
-            header.orientation = .horizontal
-            header.alignment = .centerY
-            header.spacing = 6
-            header.widthAnchor.constraint(equalToConstant: 410).isActive = true
-            stack.addArrangedSubview(header)
             if let snapshot = profile.snapshot {
-                if snapshot.windows.isEmpty { appendInfo("No allowance windows returned", to: stack) }
-                for window in snapshot.windows { appendUsageRow(window, to: stack) }
+                if snapshot.windows.isEmpty { info("No allowance windows returned", in: menu) }
+                for window in snapshot.windows { usageRow(window, in: menu) }
             }
             if let job = jobs[profile.id], job.work != .refresh {
-                appendInfo(job.status, to: stack)
+                info(job.status, in: menu)
             } else if let failure = failures[profile.id] {
-                appendInfo(failure.text, to: stack)
+                info(failure.text, in: menu)
             }
             if profile.snapshot?.due(interval: interval) == true ||
                 (profile.snapshot != nil && failures[profile.id] != nil) {
-                appendInfo("Stale · Showing the last successful reading", to: stack)
+                info("Stale · Showing the last successful reading", in: menu)
             } else if profile.snapshot == nil && jobs[profile.id] == nil && failures[profile.id] == nil {
-                appendInfo("Waiting for first reading", to: stack)
+                info("Waiting for first reading", in: menu)
             }
         }
-        appendDivider(to: stack)
-        if !refreshBatch.isEmpty { appendInfo("Refreshing accounts…", to: stack) }
-        if !config.profiles.isEmpty, let lastRefreshed = config.lastRefreshed {
-            appendInfo("Last refreshed \(dateText(lastRefreshed))", to: stack, color: .secondaryLabelColor)
-        }
+        if !refreshBatch.isEmpty { info("Refreshing accounts…", in: menu) }
+        refreshRow(in: menu)
         if let loginID {
-            let show = NSButton(title: "Show Sign-In", target: self, action: #selector(showSignIn))
-            show.isBordered = false
-            show.alignment = .left
-            stack.addArrangedSubview(show)
-            let cancel = NSButton(title: "Cancel Sign-In", target: self, action: #selector(cancelSignIn))
-            cancel.isBordered = false
-            cancel.alignment = .left
-            cancel.cell?.representedObject = loginID
-            stack.addArrangedSubview(cancel)
+            action("Show Sign-In", #selector(showSignIn), in: menu)
+            action("Cancel Sign-In", #selector(cancelSignIn), in: menu, id: loginID)
         }
-        let settings = NSButton(title: "Settings…", target: self, action: #selector(openSettingsFromPopover))
-        settings.isBordered = false
-        settings.alignment = .left
-        stack.addArrangedSubview(settings)
-        let quit = NSButton(title: "Quit Codex Usage", target: self, action: #selector(quitFromPopover))
-        quit.isBordered = false
-        quit.alignment = .left
-        stack.addArrangedSubview(quit)
-        stack.setFrameSize(stack.fittingSize)
-        let controller = NSViewController()
-        controller.view = stack
-        popover.contentViewController = controller
-        popover.contentSize = NSSize(width: 438, height: stack.fittingSize.height)
+        action("Settings…", #selector(settings), in: menu, key: ",")
+        action("Quit Usage", #selector(quit), in: menu, key: "q")
     }
 
-    private func appendUsageRow(_ window: Window, to stack: NSStackView) {
+    func menuWillOpen(_ menu: NSMenu) {
+        menuIsOpen = true
+        DispatchQueue.main.async { [weak self] in self?.beginRefreshBatch(manual: true) }
+    }
+
+    func menuDidClose(_ menu: NSMenu) { menuIsOpen = false }
+
+    private func usageRow(_ window: Window, in menu: NSMenu) {
         let title = NSTextField(labelWithString: shortWindowTitle(window))
-        title.font = .systemFont(ofSize: NSFont.systemFontSize)
+        title.font = .menuFont(ofSize: 0)
         title.textColor = .labelColor
         let remaining = NSTextField(labelWithString: "\(window.remaining)% left")
-        remaining.font = .systemFont(ofSize: NSFont.systemFontSize)
+        remaining.font = .menuFont(ofSize: 0)
         remaining.textColor = .labelColor
         let reset = NSTextField(labelWithString: window.reset.map(dateText) ?? "")
-        reset.font = .systemFont(ofSize: NSFont.systemFontSize)
+        reset.font = .menuFont(ofSize: 0)
         reset.textColor = .secondaryLabelColor
         reset.alignment = .right
         let row = NSStackView(views: [title, remaining, NSView(), reset])
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 10
+        row.spacing = 12
         row.setCustomSpacing(0, after: row.views[2])
-        row.widthAnchor.constraint(equalToConstant: 410).isActive = true
-        reset.widthAnchor.constraint(greaterThanOrEqualToConstant: 185).isActive = true
-        stack.addArrangedSubview(row)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 24))
+        host.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 17),
+            row.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -14),
+            row.centerYAnchor.constraint(equalTo: host.centerYAnchor),
+            reset.widthAnchor.constraint(greaterThanOrEqualToConstant: 180)
+        ])
+        let entry = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        entry.view = host
+        menu.addItem(entry)
     }
 
-    private func appendInfo(_ title: String, to stack: NSStackView, color: NSColor = .labelColor) {
+    private func info(_ title: String, in menu: NSMenu, color: NSColor = .labelColor) {
+        let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: NSFont.systemFontSize)
+        label.font = .menuFont(ofSize: 0)
         label.textColor = color
-        stack.addArrangedSubview(label)
+        label.sizeToFit()
+        let inset: CGFloat = 14
+        let height = max(22, label.frame.height + 4)
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: label.frame.width + 2 * inset, height: height))
+        label.setFrameOrigin(NSPoint(x: inset, y: (height - label.frame.height) / 2))
+        row.addSubview(label)
+        entry.view = row
+        menu.addItem(entry)
     }
 
-    private func appendDivider(to stack: NSStackView) {
-        let divider = NSBox()
-        divider.boxType = .separator
-        divider.widthAnchor.constraint(equalToConstant: 410).isActive = true
-        stack.addArrangedSubview(divider)
+    private func refreshRow(in menu: NSMenu) {
+        menu.addItem(.separator())
+        let title = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
+        title.isBordered = false
+        title.alignment = .left
+        let last = NSTextField(labelWithString: config.lastRefreshed.map { "Last refreshed \(dateText($0))" } ?? "Not refreshed yet")
+        last.font = .menuFont(ofSize: 0)
+        last.textColor = .secondaryLabelColor
+        last.alignment = .right
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
+        row.addSubview(title)
+        row.addSubview(last)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        last.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            title.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 14),
+            title.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            last.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 12),
+            last.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -14),
+            last.centerYAnchor.constraint(equalTo: row.centerYAnchor)
+        ])
+        let entry = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        entry.view = row
+        menu.addItem(entry)
     }
 
     private func action(_ title: String, _ selector: Selector, in menu: NSMenu, id: UUID? = nil, key: String = "") {
@@ -238,21 +233,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         entry.target = self
         entry.representedObject = id
         menu.addItem(entry)
-    }
-
-    @objc private func showAccountActions(_ sender: NSButton) {
-        guard let menu = sender.cell?.representedObject as? NSMenu else { return }
-        menu.popUp(positioning: nil, at: NSPoint(x: sender.bounds.maxX, y: sender.bounds.minY), in: sender)
-    }
-
-    @objc private func openSettingsFromPopover() {
-        popover.performClose(nil)
-        settings()
-    }
-
-    @objc private func quitFromPopover() {
-        popover.performClose(nil)
-        quit()
     }
 
     private func shortWindowTitle(_ window: Window) -> String {
@@ -284,9 +264,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         item.button?.title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
         var details = [window, week].compactMap { $0 }.map { "\($0.title) · \($0.remaining)% left" }
         if let mostAvailable { details.insert(mostAvailable.profile.label, at: 0) }
-        item.button?.toolTip = details.isEmpty ? "Codex Usage" :
+        item.button?.toolTip = details.isEmpty ? "Usage" :
             details.joined(separator: " | ") + (stale ? " · stale" : "")
-        item.button?.setAccessibilityLabel(item.button?.toolTip ?? "Codex Usage")
+        item.button?.setAccessibilityLabel(item.button?.toolTip ?? "Usage")
     }
 
     private func commit(_ next: Configuration) throws {
@@ -299,7 +279,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         }
         WidgetCenter.shared.reloadAllTimelines()
         updateIcon()
-        if popover.isShown { updatePopover() }
+        if menuIsOpen { menu.update() }
     }
 
     private func change(_ edit: (inout Configuration) -> Void) {
@@ -309,7 +289,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
             try commit(next)
         } catch {
             storageProblem = true
-            alert("Could not save settings", "Check access to the shared Codex Usage storage.")
+            alert("Could not save settings", "Check access to the shared Usage storage.")
         }
         schedule()
     }
@@ -371,7 +351,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         if !quitPending { next?() }
         if quitPending && jobs.isEmpty { NSApp.reply(toApplicationShouldTerminate: true) }
         updateIcon()
-        if popover.isShown { updatePopover() }
+        if menuIsOpen { menu.update() }
         schedule()
     }
 
@@ -416,7 +396,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         }
         refreshBatch = Set(accounts.map(\.id))
         batchUpdated = false
-        if popover.isShown { updatePopover() }
+        if menuIsOpen { menu.update() }
         accounts.forEach { refresh($0.id) }
     }
 
@@ -428,8 +408,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
     }
 
     @objc private func rename(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
-              let profile = config.profiles.first(where: { $0.id == id }),
+        guard let id = sender.representedObject as? UUID else { return }
+        renameProfile(id)
+    }
+
+    @objc private func renameProfileButton(_ sender: NSButton) {
+        guard let id = sender.cell?.representedObject as? UUID else { return }
+        renameProfile(id)
+    }
+
+    private func renameProfile(_ id: UUID) {
+        guard let profile = config.profiles.first(where: { $0.id == id }),
               let label = prompt("Rename Account", value: profile.label, button: "Rename") else { return }
         change { config in
             if let index = config.profiles.firstIndex(where: { $0.id == id }) {
@@ -439,7 +428,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
     }
 
     @objc private func reauthenticate(_ sender: NSMenuItem) {
-        guard loginID == nil, let id = sender.representedObject as? UUID, jobs[id]?.work != .remove,
+        guard let id = sender.representedObject as? UUID else { return }
+        reauthenticateProfile(id)
+    }
+
+    @objc private func reauthenticateProfileButton(_ sender: NSButton) {
+        guard let id = sender.cell?.representedObject as? UUID else { return }
+        reauthenticateProfile(id)
+    }
+
+    private func reauthenticateProfile(_ id: UUID) {
+        guard loginID == nil, jobs[id]?.work != .remove,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         beginLogin(id, label: profile.label, existing: true)
     }
@@ -595,7 +594,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
     }
 
     @objc private func remove(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID, id != loginID, jobs[id]?.work != .remove,
+        guard let id = sender.representedObject as? UUID else { return }
+        removeProfile(id)
+    }
+
+    @objc private func removeProfileButton(_ sender: NSButton) {
+        guard let id = sender.cell?.representedObject as? UUID else { return }
+        removeProfile(id)
+    }
+
+    private func removeProfile(_ id: UUID) {
+        guard id != loginID, jobs[id]?.work != .remove,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         let dialog = NSAlert()
         dialog.messageText = "Are you sure you want to remove \(profile.label)?"
@@ -740,7 +749,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
         tabs.addTabViewItem(accountsItem)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Codex Usage"
+        window.title = "Usage"
         window.contentViewController = tabs
         window.center()
         window.isReleasedWhenClosed = false
@@ -804,7 +813,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
             column.orientation = .vertical
             column.alignment = .leading
             column.spacing = 3
-            return column
+            let actions = NSStackView(views: [
+                profileButton("Rename…", selector: #selector(renameProfileButton(_:)), id: profile.id),
+                profileButton("Details…", selector: #selector(accountDetailsForButton(_:)), id: profile.id),
+                profileButton("Reauthenticate…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id),
+                profileButton("Remove…", selector: #selector(removeProfileButton(_:)), id: profile.id)
+            ])
+            actions.orientation = .horizontal
+            actions.alignment = .centerY
+            actions.spacing = 8
+            let card = NSStackView(views: [column, actions])
+            card.orientation = .vertical
+            card.alignment = .leading
+            card.spacing = 8
+            return card
         }
         var content: [NSView] = [intro, refresh, addAccount, details]
         if !rows.isEmpty {
@@ -818,6 +840,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
             content.append(empty)
         }
         return settingsPage(content)
+    }
+
+    private func profileButton(_ title: String, selector: Selector, id: UUID) -> NSButton {
+        let button = NSButton(title: title, target: self, action: selector)
+        button.cell?.representedObject = id
+        return button
     }
 
     @objc private func changeRefreshInterval(_ sender: NSPopUpButton) {
@@ -847,7 +875,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
             if wantsOn { try SMAppService.mainApp.register() }
             else { try SMAppService.mainApp.unregister() }
             if wantsOn && SMAppService.mainApp.status == .requiresApproval {
-                alert("Launch at login needs approval", "Enable Codex Usage in System Settings under General → Login Items.")
+                alert("Launch at login needs approval", "Enable Usage in System Settings under General → Login Items.")
             }
         } catch {
             alert("Could not change launch at login", error.localizedDescription)
@@ -873,11 +901,28 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSTextFieldDelegate, NSW
     }
 
     @objc private func accountDetails() {
-        let details = config.profiles.map { profile in
-            let context = profile.identity.context
-            return context.isEmpty ? profile.label : "\(profile.label)\n\(context)"
-        }
+        let details = config.profiles.map { accountDetailText($0) }
         alert("Account Details", details.joined(separator: "\n\n"))
+    }
+
+    @objc private func accountDetailsForMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        showAccountDetails(id)
+    }
+
+    @objc private func accountDetailsForButton(_ sender: NSButton) {
+        guard let id = sender.cell?.representedObject as? UUID else { return }
+        showAccountDetails(id)
+    }
+
+    private func showAccountDetails(_ id: UUID) {
+        guard let profile = config.profiles.first(where: { $0.id == id }) else { return }
+        alert("Account Details", accountDetailText(profile))
+    }
+
+    private func accountDetailText(_ profile: Profile) -> String {
+        let context = profile.identity.context
+        return context.isEmpty ? profile.label : "\(profile.label)\n\(context)"
     }
 
     func windowWillClose(_ notification: Notification) {

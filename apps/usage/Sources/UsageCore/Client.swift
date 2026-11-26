@@ -120,7 +120,7 @@ public struct Client {
         let rpc = try RPC(binary: binary, home: home, cancellation: cancellation, timeout: timeout)
         defer { rpc.close() }
         let result = try rpc.call("initialize", ["clientInfo": [
-            "name": "codex_usage", "title": "Codex Usage", "version": "0.1.0"
+            "name": "codex_usage", "title": "Usage", "version": "0.1.0"
         ]], deadline: DispatchTime.now() + 10)
         guard let reported = result["codexHome"] as? String,
               URL(fileURLWithPath: reported).standardizedFileURL.path == home.path

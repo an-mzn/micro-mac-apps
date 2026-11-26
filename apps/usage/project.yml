@@ -38,8 +38,8 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Codex Usage
-        CFBundleName: Codex Usage
+        CFBundleDisplayName: Usage
+        CFBundleName: Usage
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
         NSHighResolutionCapable: true
