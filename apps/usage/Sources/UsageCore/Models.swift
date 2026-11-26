@@ -126,6 +126,7 @@ public struct Profile: Codable, Equatable, Identifiable {
 
 public struct Configuration: Codable, Equatable {
     public var profiles: [Profile] = []
+    public var lastRefreshed: Date?
     public var minutes = 15
     public var binary: String?
     public var menuProfile: UUID?

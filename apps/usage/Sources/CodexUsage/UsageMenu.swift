@@ -26,6 +26,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let retry: Date
     }
     private var jobs: [UUID: Job] = [:]
+    private var refreshBatch: Set<UUID> = []
+    private var batchUpdated = false
     private var afterJob: [UUID: () -> Void] = [:]
     private var failures: [UUID: Failure] = [:]
     private var loginPanel: NSPanel?
@@ -101,19 +103,15 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let header = NSMenuItem(title: label, action: nil, keyEquivalent: "")
             header.submenu = manage
             menu.addItem(header)
-            let context = profile.identity.context
-            if !context.isEmpty { info(context, in: menu) }
             if let snapshot = profile.snapshot {
                 if snapshot.windows.isEmpty { info("No allowance windows returned", in: menu) }
                 for window in snapshot.windows {
                     let reset = window.reset.map { " · resets \(dateText($0))" } ?? ""
-                    let low = window.remaining <= 15 ? " · Low" : ""
-                    info("\(window.title)   \(window.remaining)% left\(low)\(reset)", in: menu)
+                    info("\(shortWindowTitle(window))   \(window.remaining)% left\(reset)", in: menu)
                 }
-                info("Updated \(dateText(snapshot.at))", in: menu)
             }
             if let job = jobs[profile.id] {
-                info(job.status, in: menu)
+                if job.work != .refresh { info(job.status, in: menu) }
             } else if let failure = failures[profile.id] {
                 info(failure.text, in: menu)
             }
@@ -123,12 +121,15 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else if profile.snapshot == nil && jobs[profile.id] == nil && failures[profile.id] == nil {
                 info("Waiting for first reading", in: menu)
             }
-            action("Refresh Account", #selector(refreshOne(_:)), in: manage, id: profile.id)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
             action("Reauthenticate…", #selector(reauthenticate(_:)), in: manage, id: profile.id)
             action("Remove…", #selector(remove(_:)), in: manage, id: profile.id)
         }
         menu.addItem(.separator())
+        if !refreshBatch.isEmpty { info("Refreshing accounts…", in: menu) }
+        if !config.profiles.isEmpty, let lastRefreshed = config.lastRefreshed {
+            info("Last refreshed \(dateText(lastRefreshed))", in: menu)
+        }
         if let loginID {
             action("Show Sign-In", #selector(showSignIn), in: menu)
             action("Cancel Sign-In", #selector(cancelSignIn), in: menu, id: loginID)
@@ -165,6 +166,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         entry.target = self
         entry.representedObject = id
         menu.addItem(entry)
+    }
+
+    private func shortWindowTitle(_ window: Window) -> String {
+        let duration: String
+        switch window.minutes {
+        case 300: duration = "5h"
+        case 10_080: duration = "Wk"
+        default: return window.title
+        }
+        return window.bucketID == "codex" ? duration : "\(window.bucket) · \(duration)"
     }
 
     private func dateText(_ date: Date) -> String {
@@ -214,7 +225,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func schedule() {
         timer?.invalidate()
         timer = nil
-        guard !asleep, !quitPending, !ProcessInfo.processInfo.isLowPowerModeEnabled, cli != nil else { return }
+        guard refreshBatch.isEmpty, !asleep, !quitPending, !ProcessInfo.processInfo.isLowPowerModeEnabled, cli != nil else { return }
         let now = Date()
         let next = config.profiles.compactMap { profile -> Date? in
             guard jobs[profile.id] == nil else { return nil }
@@ -237,13 +248,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !asleep, !quitPending, !ProcessInfo.processInfo.isLowPowerModeEnabled,
               (onOpen || Date() >= grace), cli != nil else { return }
         let now = Date()
-        for profile in config.profiles {
-            if let failure = failures[profile.id] {
-                if failure.retry <= now { refresh(profile.id) }
-            } else if profile.snapshot?.due(interval: interval, now: now) != false {
-                refresh(profile.id)
-            }
+        let hasDueAccount = config.profiles.contains { profile in
+            guard jobs[profile.id] == nil else { return false }
+            if let failure = failures[profile.id] { return failure.retry <= now }
+            return profile.snapshot?.due(interval: interval, now: now) != false
         }
+        if hasDueAccount { beginRefreshBatch() }
     }
 
     private func start<T>(_ id: UUID, _ job: Job, perform: @escaping () throws -> T,
@@ -263,6 +273,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func finish<T>(_ id: UUID, work: Work, _ result: Result<T, Error>, complete: (Result<T, Error>) -> Void) {
         let next = afterJob.removeValue(forKey: id)
         if work != .refresh || (next == nil && !quitPending) { complete(result) }
+        if work == .refresh, refreshBatch.remove(id) != nil, refreshBatch.isEmpty, batchUpdated, !quitPending {
+            change { $0.lastRefreshed = Date() }
+        }
         if !quitPending { next?() }
         if quitPending && jobs.isEmpty { NSApp.reply(toApplicationShouldTerminate: true) }
         updateIcon()
@@ -284,6 +297,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 next.profiles[index].snapshot = snapshot
                 try self.commit(next)
                 self.failures.removeValue(forKey: id)
+                self.batchUpdated = true
             } catch let error as UsageError where error == .cancelled {
                 return
             } catch {
@@ -297,14 +311,19 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshAll() {
         guard cli != nil else { alert("CLI unavailable", "Select a Codex executable in Settings."); return }
-        config.profiles.forEach { refresh($0.id) }
+        beginRefreshBatch(manual: true)
     }
 
-    @objc private func refreshOne(_ sender: NSMenuItem) {
-        if let id = sender.representedObject as? UUID {
-            guard cli != nil else { alert("CLI unavailable", "Select a Codex executable in Settings."); return }
-            refresh(id)
+    private func beginRefreshBatch(manual: Bool = false) {
+        guard refreshBatch.isEmpty, !quitPending, cli != nil else { return }
+        let now = Date()
+        let accounts = config.profiles.filter { profile in
+            guard jobs[profile.id] == nil, afterJob[profile.id] == nil else { return false }
+            return manual || failures[profile.id].map { $0.retry <= now } != false
         }
+        refreshBatch = Set(accounts.map(\.id))
+        batchUpdated = false
+        accounts.forEach { refresh($0.id) }
     }
 
     @objc private func add() {
@@ -367,7 +386,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         }
                         try self.commit(next)
                         self.failures.removeValue(forKey: id)
-                        self.refresh(id)
+                        self.beginRefreshBatch()
                     } catch {
                         self.storageProblem = true
                         if !existing {
@@ -558,12 +577,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let windows = profile.snapshot?.windows ?? []
             for window in windows where window.minutes == 300 {
                 if let week = windows.first(where: { $0.minutes == 10_080 && $0.bucketID == window.bucketID }) {
-                    addOption("\(profile.label) · \(window.bucket) · 5-hour + weekly",
-                              profile: profile.id, window: window.id, week: week.id)
+                    let prefix = window.bucketID == "codex" ? profile.label : "\(profile.label) · \(window.bucket)"
+                    addOption("\(prefix) · 5h + Wk", profile: profile.id, window: window.id, week: week.id)
                 }
             }
             for window in windows {
-                addOption("\(profile.label) · \(window.title)", profile: profile.id, window: window.id)
+                addOption("\(profile.label) · \(shortWindowTitle(window))", profile: profile.id, window: window.id)
             }
         }
         if config.menuShowsMostAvailable == true {
@@ -588,8 +607,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         binary.setAccessibilityLabel("Codex executable path")
         let choose = NSButton(title: "Choose Executable…", target: self, action: #selector(chooseBinary(_:)))
         choose.cell?.representedObject = binary
+        let accounts = NSButton(title: "Account Details…", target: self, action: #selector(accountDetails))
+        accounts.isEnabled = !config.profiles.isEmpty
         let stack = NSStackView(views: [NSTextField(labelWithString: "Background refresh"), interval,
-                                       NSTextField(labelWithString: "Menu bar display"), selection, launch,
+                                       NSTextField(labelWithString: "Menu bar display"), selection, accounts, launch,
                                        NSTextField(labelWithString: "Codex executable"), binary, choose])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -629,6 +650,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             alert("Could not change launch at login", error.localizedDescription)
         }
+    }
+
+    @objc private func accountDetails() {
+        let details = config.profiles.map { profile in
+            let context = profile.identity.context
+            return context.isEmpty ? profile.label : "\(profile.label)\n\(context)"
+        }
+        alert("Account Details", details.joined(separator: "\n\n"))
     }
 
     @objc private func chooseBinary(_ sender: NSButton) {
