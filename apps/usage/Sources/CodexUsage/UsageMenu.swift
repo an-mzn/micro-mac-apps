@@ -29,6 +29,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var afterJob: [UUID: () -> Void] = [:]
     private var failures: [UUID: Failure] = [:]
     private var loginPanel: NSPanel?
+    private var deviceCode: String?
+    private weak var copyCodeButton: NSButton?
     private var loginID: UUID?
     private var timer: Timer?
     private var asleep = false
@@ -401,7 +403,18 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let url = sender.identifier.map(\.rawValue).flatMap(URL.init(string:)) { NSWorkspace.shared.open(url) }
     }
 
+    @objc private func copyDeviceCode() {
+        guard let deviceCode else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        if pasteboard.setString(deviceCode, forType: .string) {
+            copyCodeButton?.title = "Copied"
+        }
+    }
+
     private func endLogin() {
+        deviceCode = nil
+        copyCodeButton = nil
         loginPanel?.orderOut(nil)
         loginPanel = nil
         loginID = nil
@@ -412,16 +425,26 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                          styleMask: [.titled], backing: .buffered, defer: false)
         panel.title = "ChatGPT Sign-In"
         panel.hidesOnDeactivate = false
+        deviceCode = challenge?.code
+        copyCodeButton = nil
         let label = NSTextField(wrappingLabelWithString: message)
         let stack = NSStackView(views: [label])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
         if let challenge {
-            let code = NSTextField(labelWithString: challenge.code)
+            let code = NSButton(title: challenge.code, target: self, action: #selector(copyDeviceCode))
+            code.isBordered = false
             code.font = .monospacedSystemFont(ofSize: 22, weight: .semibold)
-            code.isSelectable = true
-            stack.addArrangedSubview(code)
+            code.toolTip = "Click to copy the one-time code"
+            code.setAccessibilityHelp("Copies the one-time code to the clipboard.")
+            let copy = NSButton(title: "Copy", target: self, action: #selector(copyDeviceCode))
+            copyCodeButton = copy
+            let codeRow = NSStackView(views: [code, copy])
+            codeRow.orientation = .horizontal
+            codeRow.alignment = .centerY
+            codeRow.spacing = 12
+            stack.addArrangedSubview(codeRow)
             let browser = NSButton(title: "Open Verification Page", target: self, action: #selector(openVerification(_:)))
             browser.keyEquivalent = "\r"
             browser.identifier = NSUserInterfaceItemIdentifier(challenge.url.absoluteString)
