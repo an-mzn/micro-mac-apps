@@ -60,6 +60,10 @@ public struct Window: Codable, Equatable {
 }
 
 public struct Limits: Decodable {
+    struct ResetCredits: Decodable {
+        let availableCount: Int
+    }
+
     struct Bucket: Decodable {
         struct Credits: Decodable {
             let hasCredits: Bool
@@ -80,6 +84,9 @@ public struct Limits: Decodable {
     let rateLimits: Bucket?
     let rateLimitsByLimitId: [String: Bucket]?
     public let accountId: String?
+    let rateLimitResetCredits: ResetCredits?
+
+    public var bankedResetCount: Int? { rateLimitResetCredits?.availableCount }
 
     public var creditBalance: String? {
         if let credits = rateLimits?.credits ?? rateLimitsByLimitId?["codex"]?.credits {
@@ -118,12 +125,15 @@ public struct Snapshot: Codable, Equatable {
     public let windows: [Window]
     public let creditBalance: String?
     public let unlimitedCredits: Bool?
+    public let bankedResetCount: Int?
 
-    public init(at: Date = Date(), windows: [Window], creditBalance: String? = nil, unlimitedCredits: Bool? = nil) {
+    public init(at: Date = Date(), windows: [Window], creditBalance: String? = nil,
+                unlimitedCredits: Bool? = nil, bankedResetCount: Int? = nil) {
         self.at = at
         self.windows = windows
         self.creditBalance = creditBalance
         self.unlimitedCredits = unlimitedCredits
+        self.bankedResetCount = bankedResetCount
     }
 
     public func due(interval: TimeInterval, now: Date = Date()) -> Bool {
