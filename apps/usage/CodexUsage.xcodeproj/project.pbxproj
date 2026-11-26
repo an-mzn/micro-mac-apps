@@ -14,6 +14,7 @@
 		62D7CFA9AC9E92EF6D15D728 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D493C25C602897BC1EEC4FF /* Models.swift */; };
 		63C59D6CFD898833F0CCDE77 /* UsageCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02714327538B991E2F2F7FA /* UsageCoreTests.swift */; };
 		8765EFAE6B80C954CA18DC17 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
+		8DFEF03A4A1335C9F1E7E683 /* codex-usage.svg in Resources */ = {isa = PBXBuildFile; fileRef = 483FFECF96BC256973FF108F /* codex-usage.svg */; };
 		8E47E82A84A88B7E46E91E51 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABAB99EA47A02B6120B7365E /* Storage.swift */; };
 		9B23643E492041D9B2FE8487 /* CodexUsageWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A98E08F7F102EA0D9CDCC94F /* CodexUsageWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9CD55AB3218C473F7C759F55 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
@@ -246,6 +247,7 @@
 			buildConfigurationList = 37EB4E6D3EC71B23E9332629 /* Build configuration list for PBXNativeTarget "CodexUsageWidget" */;
 			buildPhases = (
 				411A0D785D62D37D1B121806 /* Sources */,
+				135A9AEA28996C2B409802DD /* Resources */,
 				2CE420FDE7669EE0C3F5E9F9 /* Frameworks */,
 			);
 			buildRules = (
@@ -350,6 +352,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		135A9AEA28996C2B409802DD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DFEF03A4A1335C9F1E7E683 /* codex-usage.svg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		47C4FDE38E2F8F136155C4F2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
