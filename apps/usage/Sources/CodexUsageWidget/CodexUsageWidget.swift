@@ -141,7 +141,7 @@ private struct UsageWidgetView: View {
             header
             if let account = entry.accounts.first {
                 HStack(spacing: 9) {
-                    SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 54)
+                    SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(account.label).font(.system(size: 13, weight: .semibold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.8)
@@ -254,6 +254,7 @@ private struct UsageWidgetView: View {
                     Text("\(allowance.remaining)%")
                         .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
                         .lineLimit(1).minimumScaleFactor(0.8)
+                        .layoutPriority(1)
                 }
                 if let reset = allowance.reset {
                     Text(resetTimeLeft(reset))
