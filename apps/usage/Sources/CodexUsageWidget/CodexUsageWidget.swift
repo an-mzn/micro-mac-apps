@@ -45,6 +45,26 @@ private struct UsageEntry: TimelineEntry {
     let status: String?
 }
 
+private enum ResetCountdown {
+    static let day: TimeInterval = 86_400
+
+    static func step(for seconds: TimeInterval) -> TimeInterval {
+        seconds > day ? day / 10 : 1800
+    }
+
+    static func roundedUnits(_ seconds: TimeInterval) -> Int {
+        Int(ceil(max(0, seconds) / step(for: seconds) - 0.5))
+    }
+
+    static func nextChange(reset: Date, after date: Date) -> Date? {
+        let seconds = reset.timeIntervalSince(date)
+        let units = roundedUnits(seconds)
+        guard units > 0 else { return nil }
+        let boundary = (Double(units) - 0.5) * step(for: seconds)
+        return reset.addingTimeInterval(-(seconds > day ? max(day, boundary) : boundary))
+    }
+}
+
 private struct UsageProvider: TimelineProvider {
     func placeholder(in context: Context) -> UsageEntry {
         UsageEntry(date: .now, accounts: [AccountReading(id: UUID(), label: "Personal",
@@ -59,15 +79,14 @@ private struct UsageProvider: TimelineProvider {
         var hasLaterChanges = false
         for account in entry.accounts.prefix(3) {
             for reset in [account.fiveHour?.reset, account.weekly?.reset].compactMap({ $0 }) {
-                var boundary = reset.addingTimeInterval(-900)
-                if boundary > horizon {
-                    hasLaterChanges = true
-                    let steps = ceil(boundary.timeIntervalSince(horizon) / 1800)
-                    boundary = boundary.addingTimeInterval(-steps * 1800)
-                }
-                while boundary > entry.date {
+                var date = entry.date
+                while let boundary = ResetCountdown.nextChange(reset: reset, after: date), boundary > date {
+                    guard boundary <= horizon else {
+                        hasLaterChanges = true
+                        break
+                    }
                     dates.insert(boundary)
-                    boundary = boundary.addingTimeInterval(-1800)
+                    date = boundary
                 }
             }
         }
@@ -216,7 +235,12 @@ private struct UsageWidgetView: View {
     }
     private func resetTimeLeft(_ reset: Date) -> String {
         let seconds = max(0, reset.timeIntervalSince(entry.date))
-        let halfHours = Int(ceil(seconds / 1800 - 0.5))
+        let units = ResetCountdown.roundedUnits(seconds)
+        if seconds > ResetCountdown.day {
+            let tenths = units % 10
+            return tenths == 0 ? "\(units / 10)d" : "\(units / 10).\(tenths)d"
+        }
+        let halfHours = units
         return halfHours.isMultiple(of: 2) ? "\(halfHours / 2)h" : "\(halfHours / 2).5h"
     }
 
