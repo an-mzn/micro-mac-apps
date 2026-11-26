@@ -95,6 +95,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { config = try storage.load() }
         catch { storageProblem = true; loadFailed = true }
+        WidgetCenter.shared.reloadAllTimelines()
         let icon = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
         icon?.size = NSSize(width: 18, height: 18)
@@ -143,15 +144,15 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         for profile in orderedProfiles {
             menu.addItem(.separator())
             let manage = NSMenu()
-            let summary = profile.snapshot == nil ? nil : accountCreditSummary(profile)
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
-            if let summary {
+            if let snapshot = profile.snapshot {
+                let summary = bankedResetSummary(snapshot.bankedResetCount)
                 header.attributedTitle = NSAttributedString(string: "\(profile.label)    \(summary)", attributes: [
                     .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor
                 ])
                 let value = NSMutableAttributedString(attributedString: header.attributedTitle!)
                 value.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor,
-                                   range: NSRange(location: (profile.label + "    ").count, length: summary.count))
+                                   range: NSRange(location: (profile.label + "    ").utf16.count, length: summary.utf16.count))
                 header.attributedTitle = value
             }
             header.submenu = manage
@@ -310,16 +311,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return !balances.isEmpty && balances.allSatisfy { $0 == 0 }
     }
 
-    private func accountCreditSummary(_ profile: Profile) -> String? {
-        guard let snapshot = profile.snapshot else { return nil }
-        if snapshot.unlimitedCredits == true { return "Unlimited credits" }
-        guard let balance = snapshot.creditBalance,
-              let decimal = Decimal(string: balance, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 0
-        return "\(formatter.string(from: NSDecimalNumber(decimal: decimal)) ?? balance) credits"
+    private func bankedResetSummary(_ count: Int?) -> String {
+        guard let count, count >= 0 else { return "Banked resets unavailable" }
+        return "\(count) banked reset\(count == 1 ? "" : "s")"
     }
 
     private func updateIcon() {
