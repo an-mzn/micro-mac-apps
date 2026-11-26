@@ -17,6 +17,7 @@
 		8E47E82A84A88B7E46E91E51 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABAB99EA47A02B6120B7365E /* Storage.swift */; };
 		9B23643E492041D9B2FE8487 /* CodexUsageWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A98E08F7F102EA0D9CDCC94F /* CodexUsageWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9CD55AB3218C473F7C759F55 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
+		A308C2F384207A0803D3FB9D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 22AA611435F98D57126442EB /* Assets.xcassets */; };
 		B0733A38D675E229AF8CC09B /* CodexUsageWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EAC0B0A57CCE21DC78BAC38 /* CodexUsageWidget.swift */; };
 		BAEE1554BC5C925F3B5A191F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E386A19ADA12E73A4B329453 /* main.swift */; };
 		D12859F20843D875373CCEB0 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -91,6 +92,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		22AA611435F98D57126442EB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A99A6A259A28AFA09539FA3 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
 		2D493C25C602897BC1EEC4FF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		483FFECF96BC256973FF108F /* codex-usage.svg */ = {isa = PBXFileReference; path = "codex-usage.svg"; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 		BEC8AD4F77D63732F8D0772C = {
 			isa = PBXGroup;
 			children = (
+				22AA611435F98D57126442EB /* Assets.xcassets */,
 				A84BF008D1A7D726FEEEE5CD /* Assets */,
 				E42EB4DDB5209E60FC820B2B /* Sources */,
 				E50CE46EE6906E9B962C6A28 /* Tests */,
@@ -351,6 +354,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A308C2F384207A0803D3FB9D /* Assets.xcassets in Resources */,
 				198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

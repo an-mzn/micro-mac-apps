@@ -27,6 +27,8 @@ targets:
     platform: macOS
     sources:
       - Sources/CodexUsage
+      - path: Assets.xcassets
+        buildPhase: resources
       - path: Assets/codex-usage.svg
         buildPhase: resources
     dependencies:
@@ -43,6 +45,9 @@ targets:
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
         NSHighResolutionCapable: true
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   CodexUsageWidget:
     type: app-extension
     platform: macOS
