@@ -124,7 +124,7 @@ private struct UsageWidgetView: View {
                 HStack(spacing: 9) {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 54)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(account.label).font(.system(size: 12, weight: .semibold, design: .rounded))
+                        Text(account.label).font(.system(size: 13, weight: .semibold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.8)
                         compactAllowance(account.fiveHour, title: "5h")
                         compactAllowance(account.weekly, title: "Wk")
@@ -146,7 +146,7 @@ private struct UsageWidgetView: View {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(account.label)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(1)
                             HStack(spacing: 5) {
                                 SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 30)
@@ -178,7 +178,7 @@ private struct UsageWidgetView: View {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         HStack(spacing: 10) {
                             Text(account.label)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .lineLimit(1).minimumScaleFactor(0.75)
                                 .frame(width: 58, alignment: .leading)
                             allowanceColumn(account.fiveHour, title: "5 hours")
@@ -210,7 +210,8 @@ private struct UsageWidgetView: View {
                     .foregroundStyle(.primary)
                     .accessibilityHidden(true)
             }
-            Text("Usage").font(.caption.weight(.semibold)); Spacer(minLength: 0)
+            Text("Usage").font(.system(size: 14, weight: .semibold))
+            Spacer(minLength: 0)
         }
     }
     private func resetTimeLeft(_ reset: Date) -> String {
@@ -224,25 +225,25 @@ private struct UsageWidgetView: View {
         if let allowance {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 3) {
-                    Text(title).font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                     Text("\(allowance.remaining)%")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
                         .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 if let reset = allowance.reset {
                     Text(resetTimeLeft(reset))
                         .lineLimit(1).minimumScaleFactor(0.75)
-                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
             }
         } else {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 3) {
-                    Text(title).font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
-                    Text("—").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text("—").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
                 }
-                Text("Unavailable").font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                Text("Unavailable").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
                     .lineLimit(1).minimumScaleFactor(0.75)
             }
         }
@@ -250,10 +251,10 @@ private struct UsageWidgetView: View {
     private func allowanceColumn(_ allowance: Allowance?, title: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
-                .font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
             if let allowance {
                 Text("\(allowance.remaining)% left")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
                     .lineLimit(1).minimumScaleFactor(0.75)
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
@@ -270,11 +271,11 @@ private struct UsageWidgetView: View {
                         Text("Reset time unavailable").lineLimit(1).minimumScaleFactor(0.75)
                     }
                 }
-                .font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
             } else {
-                Text("—").font(.system(size: 17, weight: .semibold, design: .rounded)).foregroundStyle(.tertiary)
+                Text("—").font(.system(size: 18, weight: .semibold, design: .rounded)).foregroundStyle(.tertiary)
                 Capsule().fill(.quaternary).frame(height: 4)
-                Text("No limit reported").font(.system(size: 8, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                Text("No limit reported").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -282,7 +283,7 @@ private struct UsageWidgetView: View {
     private var footer: some View {
         HStack {
             if let refreshed = entry.refreshed {
-                Text("Updated \(refreshed, style: .relative)").font(.system(size: 9, weight: .medium, design: .rounded))
+                Text("Updated \(refreshed, style: .relative)").font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 0)
