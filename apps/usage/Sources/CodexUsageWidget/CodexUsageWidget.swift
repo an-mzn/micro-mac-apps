@@ -18,10 +18,12 @@ private struct AccountReading: Identifiable {
     let label: String
     let fiveHour: Allowance?
     let weekly: Allowance?
+    let resetCount: Int?
 
     init(profile: Profile) {
         id = profile.id
         label = profile.label
+        resetCount = profile.snapshot?.bankedResetCount
         let windows = profile.snapshot?.windows ?? []
         fiveHour = windows.first(where: { $0.minutes == 300 }).map {
             Allowance(id: $0.id, title: "5h", remaining: $0.remaining, reset: $0.reset)
@@ -35,6 +37,7 @@ private struct AccountReading: Identifiable {
         self.label = label
         self.fiveHour = fiveHour
         self.weekly = weekly
+        self.resetCount = nil
     }
     var hasUsage: Bool { fiveHour != nil || weekly != nil }
 }
@@ -197,10 +200,18 @@ private struct UsageWidgetView: View {
                 VStack(spacing: 3) {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         HStack(spacing: 10) {
-                            Text(account.label)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .lineLimit(1).minimumScaleFactor(0.75)
-                                .frame(width: 58, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(account.label)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .lineLimit(1).minimumScaleFactor(0.75)
+                                if let count = account.resetCount, count >= 0 {
+                                    Text(count == 1 ? "1 reset" : "\(count) resets")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1).minimumScaleFactor(0.75)
+                                }
+                            }
+                            .frame(width: 58, alignment: .leading)
                             if let fiveHour = account.fiveHour {
                                 allowanceColumn(fiveHour, title: "5 hours")
                             }

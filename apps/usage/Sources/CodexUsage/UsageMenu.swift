@@ -42,6 +42,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let label: String
         let fiveHour: WidgetAllowanceState
         let weekly: WidgetAllowanceState
+        let resetCount: Int?
     }
     private var jobs: [UUID: Job] = [:]
     private var refreshBatch: Set<UUID> = []
@@ -407,7 +408,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 id: profile.id,
                 label: profile.label,
                 fiveHour: WidgetAllowanceState(remaining: fiveHour?.remaining, reset: fiveHour?.reset),
-                weekly: WidgetAllowanceState(remaining: weekly?.remaining, reset: weekly?.reset)
+                weekly: WidgetAllowanceState(remaining: weekly?.remaining, reset: weekly?.reset),
+                resetCount: profile.snapshot?.bankedResetCount
             )
         }
     }
