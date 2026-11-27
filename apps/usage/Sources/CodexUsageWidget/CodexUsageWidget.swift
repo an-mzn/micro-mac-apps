@@ -141,7 +141,7 @@ private struct UsageWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             if let account = entry.accounts.first {
-                HStack(alignment: .center, spacing: 9) {
+                HStack(alignment: .center, spacing: 13) {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(account.label).font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -156,7 +156,7 @@ private struct UsageWidgetView: View {
                 Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(Color.primary.opacity(0.9))
                 Spacer(minLength: 0)
             }
-        }.padding(.horizontal, 14).padding(.vertical, 16)
+        }.padding(.horizontal, 8).padding(.vertical, 16)
     }
     private var medium: some View {
         VStack(alignment: .leading, spacing: 6) {
