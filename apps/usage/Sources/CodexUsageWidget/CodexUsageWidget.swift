@@ -141,7 +141,7 @@ private struct UsageWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             if let account = entry.accounts.first {
-                HStack(alignment: .center, spacing: 13) {
+                HStack(alignment: .center, spacing: 16) {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(account.label).font(.system(size: 13, weight: .semibold, design: .rounded))
