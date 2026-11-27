@@ -153,7 +153,7 @@ private struct UsageWidgetView: View {
                 .frame(maxHeight: .infinity, alignment: .center)
             } else {
                 Spacer(minLength: 0)
-                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
+                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(Color.primary.opacity(0.9))
                 Spacer(minLength: 0)
             }
         }.padding(.horizontal, 14).padding(.vertical, 16)
@@ -185,7 +185,7 @@ private struct UsageWidgetView: View {
                 footer
             } else {
                 Spacer(minLength: 0)
-                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(.secondary)
+                Text(entry.status ?? "No usage available").font(.caption).foregroundStyle(Color.primary.opacity(0.9))
                 Spacer(minLength: 0)
             }
         }.padding(.horizontal, 12).padding(.vertical, 15)
@@ -216,7 +216,7 @@ private struct UsageWidgetView: View {
                 footer
             } else {
                 Spacer(minLength: 0)
-                Text(entry.status ?? "No usage available").font(.callout).foregroundStyle(.secondary)
+                Text(entry.status ?? "No usage available").font(.callout).foregroundStyle(Color.primary.opacity(0.9))
                 Spacer(minLength: 0)
             }
         }.padding(16)
@@ -253,7 +253,7 @@ private struct UsageWidgetView: View {
         if let allowance {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 3) {
-                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.9))
                     Text("\(allowance.remaining)%")
                         .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
                         .lineLimit(1).minimumScaleFactor(0.8)
@@ -263,16 +263,16 @@ private struct UsageWidgetView: View {
                     Text(resetTimeLeft(reset))
                         .lineLimit(1).minimumScaleFactor(0.75)
                         .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.9))
                 }
             }
         } else {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 3) {
-                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
-                    Text("—").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                    Text(title).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.9))
+                    Text("—").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.72))
                 }
-                Text("Unavailable").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                Text("Unavailable").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.72))
                     .lineLimit(1).minimumScaleFactor(0.75)
             }
         }
@@ -280,7 +280,7 @@ private struct UsageWidgetView: View {
     private func allowanceColumn(_ allowance: Allowance?, title: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.9))
             if let allowance {
                 Text("\(allowance.remaining)% left")
                     .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
@@ -300,11 +300,11 @@ private struct UsageWidgetView: View {
                         Text("Reset time unavailable").lineLimit(1).minimumScaleFactor(0.75)
                     }
                 }
-                .font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.9))
             } else {
-                Text("—").font(.system(size: 18, weight: .semibold, design: .rounded)).foregroundStyle(.tertiary)
+                Text("—").font(.system(size: 18, weight: .semibold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.72))
                 Capsule().fill(.quaternary).frame(height: 4)
-                Text("No limit reported").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(.tertiary)
+                Text("No limit reported").font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.72))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -313,10 +313,10 @@ private struct UsageWidgetView: View {
         HStack {
             if let refreshed = entry.refreshed {
                 Text("Updated \(refreshed, style: .relative)").font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.primary.opacity(0.72))
             }
             Spacer(minLength: 0)
-            Image(systemName: "arrow.clockwise").font(.system(size: 9, weight: .medium)).foregroundStyle(.tertiary)
+            Image(systemName: "arrow.clockwise").font(.system(size: 9, weight: .medium)).foregroundStyle(Color.primary.opacity(0.72))
         }
     }
     private func gaugeColor(_ remaining: Int) -> Color {
@@ -337,7 +337,7 @@ private struct SplitAllowanceRing: View {
                 segment(weekly, from: 197, to: -17)
             }
             RoundedRectangle(cornerRadius: size * 0.04)
-                .fill(.tertiary)
+                .fill(Color.primary.opacity(0.8))
                 .frame(width: size * 0.24, height: size * 0.24)
                 .rotationEffect(.degrees(45))
         }
@@ -359,7 +359,7 @@ private struct SplitAllowanceRing: View {
         return track.stroke(.quaternary, style: style)
             .overlay {
                 RingArc(start: start, end: start + (end - start) * fraction)
-                    .stroke(.secondary, style: style)
+                    .stroke(Color.primary, style: style)
             }
     }
 }
