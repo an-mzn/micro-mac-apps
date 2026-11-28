@@ -322,11 +322,53 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         menu.addItem(entry)
     }
 
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        for case let row as RefreshMenuRow in menu.items.compactMap(\.view) {
+            row.highlighted = item?.view === row
+        }
+    }
+
     private func refreshRow(in menu: NSMenu) {
         menu.addItem(.separator())
-        let last = config.lastRefreshed.map { "Last refreshed \(dateText($0))" } ?? "Not refreshed yet"
-        info(last, in: menu, color: .tertiaryLabelColor)
-        action("Refresh All", #selector(refreshAll), in: menu, key: "r")
+        let title = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
+        title.isBordered = false
+        title.alignment = .left
+        title.contentTintColor = .labelColor
+        title.attributedTitle = NSAttributedString(string: "Refresh All", attributes: [
+            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor
+        ])
+        let last = NSTextField(labelWithString: config.lastRefreshed.map { "Last refreshed \(dateText($0))" } ?? "Not refreshed yet")
+        last.font = .menuFont(ofSize: 0)
+        last.textColor = .tertiaryLabelColor
+        last.alignment = .right
+        let shortcut = NSTextField(labelWithString: "⌘R")
+        shortcut.font = .menuFont(ofSize: 0)
+        shortcut.textColor = .tertiaryLabelColor
+        shortcut.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let row = RefreshMenuRow(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
+        row.addSubview(title)
+        row.addSubview(last)
+        row.addSubview(shortcut)
+        row.onHighlight = { highlighted in
+            last.textColor = highlighted ? .labelColor : .tertiaryLabelColor
+            shortcut.textColor = highlighted ? .labelColor : .tertiaryLabelColor
+        }
+        title.translatesAutoresizingMaskIntoConstraints = false
+        last.translatesAutoresizingMaskIntoConstraints = false
+        shortcut.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            title.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 16),
+            title.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            last.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 12),
+            last.trailingAnchor.constraint(equalTo: shortcut.leadingAnchor, constant: -10),
+            shortcut.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -20),
+            shortcut.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            last.centerYAnchor.constraint(equalTo: row.centerYAnchor)
+        ])
+        let entry = NSMenuItem(title: "Refresh All", action: #selector(refreshAll), keyEquivalent: "r")
+        entry.target = self
+        entry.view = row
+        menu.addItem(entry)
     }
 
     private func action(_ title: String, _ selector: Selector, in menu: NSMenu, id: UUID? = nil, key: String = "") {
@@ -1343,5 +1385,25 @@ private final class AccountDropRow: NSView {
               let source = UUID(uuidString: value), source != profileID else { return false }
         reorder(source, profileID)
         return true
+    }
+}
+
+private final class RefreshMenuRow: NSView {
+    var onHighlight: ((Bool) -> Void)?
+    var highlighted = false {
+        didSet {
+            guard oldValue != highlighted else { return }
+            needsDisplay = true
+            onHighlight?(highlighted)
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard highlighted else { return }
+        NSColor.labelColor.withAlphaComponent(0.42).setFill()
+        let highlight = NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 2),
+                                     xRadius: 6, yRadius: 6)
+        highlight.fill()
     }
 }
