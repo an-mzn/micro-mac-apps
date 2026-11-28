@@ -4,6 +4,13 @@ import UsageCore
 import WidgetKit
 
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
+    private static let expiringResetColor = NSColor(name: nil) { appearance in
+        if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            return NSColor(srgbRed: 1, green: 0.84, blue: 0.82, alpha: 1)
+        }
+        return NSColor(srgbRed: 0.53, green: 0.25, blue: 0.24, alpha: 1)
+    }
+
     private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
         ?? "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
@@ -173,7 +180,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                         .font: font, .foregroundColor: NSColor.tertiaryLabelColor
                     ]))
                 }
-                let resetColor = snapshot.hasBankedResetExpiringSoon() ? NSColor.systemRed : NSColor.tertiaryLabelColor
+                let resetColor = snapshot.hasBankedResetExpiringSoon() ? Self.expiringResetColor : NSColor.tertiaryLabelColor
                 title.append(NSAttributedString(string: resetSummary(snapshot.bankedResetCount), attributes: [
                     .font: font, .foregroundColor: resetColor
                 ]))
