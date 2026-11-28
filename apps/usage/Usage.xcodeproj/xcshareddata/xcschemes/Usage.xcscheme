@@ -16,10 +16,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FCE6E4635F61A5BC6925C6D1"
-               BuildableName = "CodexUsage.app"
-               BlueprintName = "CodexUsage"
-               ReferencedContainer = "container:CodexUsage.xcodeproj">
+               BlueprintIdentifier = "F6D60F6B6DA0A562E4F1FECD"
+               BuildableName = "Usage.app"
+               BlueprintName = "Usage"
+               ReferencedContainer = "container:Usage.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -30,24 +30,24 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "829CB4D1EB55CCC83ED86775"
-               BuildableName = "CodexUsageWidget.appex"
-               BlueprintName = "CodexUsageWidget"
-               ReferencedContainer = "container:CodexUsage.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "BD06133C3D1B7C261729A770"
+               BlueprintIdentifier = "69D6DE50BDFEC4AE07A87E2C"
                BuildableName = "UsageCore.framework"
                BlueprintName = "UsageCore"
-               ReferencedContainer = "container:CodexUsage.xcodeproj">
+               ReferencedContainer = "container:Usage.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A93A97CB3B8429C3525345F8"
+               BuildableName = "UsageWidget.appex"
+               BlueprintName = "UsageWidget"
+               ReferencedContainer = "container:Usage.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -61,10 +61,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "FCE6E4635F61A5BC6925C6D1"
-            BuildableName = "CodexUsage.app"
-            BlueprintName = "CodexUsage"
-            ReferencedContainer = "container:CodexUsage.xcodeproj">
+            BlueprintIdentifier = "F6D60F6B6DA0A562E4F1FECD"
+            BuildableName = "Usage.app"
+            BlueprintName = "Usage"
+            ReferencedContainer = "container:Usage.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -73,10 +73,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0F8D4CF740AC9972279DDD18"
+               BlueprintIdentifier = "AA2B93C4E5BA2E44C82C362F"
                BuildableName = "UsageCoreTests.xctest"
                BlueprintName = "UsageCoreTests"
-               ReferencedContainer = "container:CodexUsage.xcodeproj">
+               ReferencedContainer = "container:Usage.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -97,10 +97,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "FCE6E4635F61A5BC6925C6D1"
-            BuildableName = "CodexUsage.app"
-            BlueprintName = "CodexUsage"
-            ReferencedContainer = "container:CodexUsage.xcodeproj">
+            BlueprintIdentifier = "F6D60F6B6DA0A562E4F1FECD"
+            BuildableName = "Usage.app"
+            BlueprintName = "Usage"
+            ReferencedContainer = "container:Usage.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -114,10 +114,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "FCE6E4635F61A5BC6925C6D1"
-            BuildableName = "CodexUsage.app"
-            BlueprintName = "CodexUsage"
-            ReferencedContainer = "container:CodexUsage.xcodeproj">
+            BlueprintIdentifier = "F6D60F6B6DA0A562E4F1FECD"
+            BuildableName = "Usage.app"
+            BlueprintName = "Usage"
+            ReferencedContainer = "container:Usage.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

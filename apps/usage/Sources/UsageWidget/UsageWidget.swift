@@ -123,7 +123,7 @@ private struct UsageProvider: TimelineProvider {
     }
 }
 
-struct CodexUsageWidget: Widget {
+struct UsageWidget: Widget {
     let kind = "CodexUsageWidget"
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: UsageProvider()) { entry in
@@ -466,6 +466,6 @@ private struct RingArc: Shape {
 }
 
 @main
-struct CodexUsageWidgetBundle: WidgetBundle {
-    var body: some Widget { CodexUsageWidget() }
+struct UsageWidgetBundle: WidgetBundle {
+    var body: some Widget { UsageWidget() }
 }

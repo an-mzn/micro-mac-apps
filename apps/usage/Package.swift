@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodexUsage",
+    name: "Usage",
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "UsageCore"),
-        .executableTarget(name: "CodexUsage", dependencies: ["UsageCore"]),
+        .executableTarget(name: "Usage", dependencies: ["UsageCore"]),
         .testTarget(name: "UsageCoreTests", dependencies: ["UsageCore"])
     ]
 )
