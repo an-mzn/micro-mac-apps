@@ -322,6 +322,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         menu.addItem(entry)
     }
 
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        for case let row as RefreshMenuRow in menu.items.compactMap(\.view) {
+            row.highlighted = item?.view === row
+        }
+    }
+
     private func refreshRow(in menu: NSMenu) {
         menu.addItem(.separator())
         let title = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
@@ -339,7 +345,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         shortcut.font = .menuFont(ofSize: 0)
         shortcut.textColor = .tertiaryLabelColor
         shortcut.setContentCompressionResistancePriority(.required, for: .horizontal)
-        let row = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
+        let row = RefreshMenuRow(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
         row.addSubview(title)
         row.addSubview(last)
         row.addSubview(shortcut)
@@ -1375,5 +1381,23 @@ private final class AccountDropRow: NSView {
               let source = UUID(uuidString: value), source != profileID else { return false }
         reorder(source, profileID)
         return true
+    }
+}
+
+
+private final class RefreshMenuRow: NSView {
+    var highlighted = false {
+        didSet {
+            if oldValue != highlighted { needsDisplay = true }
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard highlighted else { return }
+        NSColor.selectedMenuItemColor.setFill()
+        let highlight = NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 2),
+                                     xRadius: 6, yRadius: 6)
+        highlight.fill()
     }
 }
