@@ -174,6 +174,18 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var identity: Identity
     public var claudeSnapshotPath: String?
     public var antigravitySnapshotPath: String?
+    public var isGrok: Bool { identity.account.type == "grok" }
+    public var usesCodexCLI: Bool { !isGrok && localSnapshotPath == nil }
+
+    public static func grok(id: UUID = UUID(), label: String, usedPercentage: Double, reset: Date?) -> Profile? {
+        guard (0...100).contains(usedPercentage) else { return nil }
+        let account = Account(type: "grok", email: nil, planType: nil, workspaceName: "Grok · Manual")
+        let window = Window(id: "grok:Weekly", bucket: "Grok", slot: "Weekly",
+                            minutes: 10_080, used: usedPercentage, reset: reset)
+        return Profile(id: id, label: label, identity: Identity(account: account, workspaceID: nil),
+                       snapshot: Snapshot(windows: [window]))
+    }
+
     public var localSnapshotPath: String? { antigravitySnapshotPath ?? claudeSnapshotPath }
     public var snapshot: Snapshot?
 

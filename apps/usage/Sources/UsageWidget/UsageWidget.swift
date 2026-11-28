@@ -17,6 +17,7 @@ private struct AccountReading: Identifiable {
     let id: UUID
     let label: String
     let isClaude: Bool
+    let isGrok: Bool
     let isAntigravity: Bool
     let quotas: [Allowance]
     let fiveHour: Allowance?
@@ -27,6 +28,7 @@ private struct AccountReading: Identifiable {
         id = profile.id
         label = profile.label
         isClaude = profile.claudeSnapshotPath != nil
+        isGrok = profile.isGrok
         isAntigravity = profile.antigravitySnapshotPath != nil
         resetCount = profile.snapshot?.bankedResetCount
         let windows = profile.snapshot?.windows ?? []
@@ -44,6 +46,7 @@ private struct AccountReading: Identifiable {
         self.id = id
         self.label = label
         self.isClaude = false
+        self.isGrok = false
         self.isAntigravity = false
         self.quotas = []
         self.fiveHour = fiveHour
@@ -166,7 +169,7 @@ private struct UsageWidgetView: View {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
                         accountName(account, size: 13)
-                        compactAllowance(account.fiveHour, title: "5h")
+                        if !account.isGrok { compactAllowance(account.fiveHour, title: "5h") }
                         compactAllowance(account.weekly, title: "Wk")
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -276,6 +279,7 @@ private struct UsageWidgetView: View {
     }
 
     private static let openAILogo = providerLogo("openai")
+    private static let grokIcon = NSImage(systemSymbolName: "g.circle", accessibilityDescription: "Grok")
     private static let googleLogo = providerLogo("google")
     private static let claudeLogo = providerLogo("claude")
 
@@ -286,7 +290,9 @@ private struct UsageWidgetView: View {
 
     private func accountName(_ account: AccountReading, size: CGFloat) -> some View {
         HStack(spacing: 4) {
-            let logo = account.isAntigravity ? Self.googleLogo : (account.isClaude ? Self.claudeLogo : Self.openAILogo)
+            let logo = account.isGrok ? Self.grokIcon : (
+                account.isAntigravity ? Self.googleLogo : (account.isClaude ? Self.claudeLogo : Self.openAILogo)
+            )
             if let logo {
                 Image(nsImage: logo)
                     .renderingMode(.template)

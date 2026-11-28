@@ -1,10 +1,10 @@
 # Usage
 
-Usage is a native macOS menu bar app and widget for tracking remaining Codex, Claude Code, and Google Antigravity allowance across accounts. It shows the last successful reading for each profile.
+Usage is a native macOS menu bar app and widget for tracking remaining Codex, Claude Code, Google Antigravity, and Grok allowance across accounts. It shows the last successful reading for each profile.
 
 [MIT licence](LICENSE) · [Build from source](#build-from-source) · [Contributing](#contributing)
 
-Connect an account: [OpenAI Codex](#connect-openai-codex) · [Claude Code](#connect-claude-code) · [Google Antigravity](#connect-google-antigravity)
+Connect an account: [OpenAI Codex](#connect-openai-codex) · [Claude Code](#connect-claude-code) · [Google Antigravity](#connect-google-antigravity) · [Grok](#add-grok)
 
 ## Install
 
@@ -71,6 +71,18 @@ The helper exports bucket IDs, fractions, and reset times only. It skips
 disabled buckets and buckets reported solely as amounts. This integration
 covers the Antigravity CLI and its model quotas. Gemini web, AI Studio, Gemini
 API projects, and standalone Gemini CLI do not use this integration.
+
+## Add Grok
+
+Open [Grok](https://grok.com/) and go to **Settings → Usage**. In Usage, choose
+**Settings → Accounts → Add Grok Account…**, then enter the weekly percentage
+**used** and optionally the reset date and time. Usage converts it to the
+percentage remaining and shows it in the menu and widgets.
+
+Choose **Update Grok Usage…** from the account menu or Accounts settings to
+enter a fresh reading. Grok entries are manual and do not participate in automatic
+refreshes. The documented Grok Build status line exposes session data rather
+than the subscription-wide weekly allowance.
 
 ## Refresh and settings
 

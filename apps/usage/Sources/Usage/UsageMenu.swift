@@ -16,15 +16,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     private static func providerLogos(tint: NSColor) -> [String: NSImage] {
         var logos: [String: NSImage] = [:]
-        for name in ["openai", "claude", "google"] {
+        for name in ["openai", "claude", "google", "grok"] {
             logos[name] = providerLogo(named: name, tint: tint)
         }
         return logos
     }
 
     private static func providerLogo(named name: String, tint: NSColor) -> NSImage? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "svg"),
-              let image = NSImage(contentsOf: url) else { return nil }
+        let source = name == "grok"
+            ? NSImage(systemSymbolName: "g.circle", accessibilityDescription: "Grok")
+            : Bundle.main.url(forResource: name, withExtension: "svg").flatMap { NSImage(contentsOf: $0) }
+        guard let image = source else { return nil }
         let size = NSSize(width: 14, height: 14)
         let raster = NSImage(size: size)
         raster.lockFocus()
@@ -190,7 +192,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         if storageProblem { info("Could not read or save profile settings", in: menu) }
-        if cli == nil, config.profiles.contains(where: { $0.localSnapshotPath == nil }) {
+        if cli == nil, config.profiles.contains(where: { $0.usesCodexCLI }) {
             info("Codex CLI unavailable · Select a binary in Settings", in: menu)
         }
         if config.profiles.isEmpty { info("No accounts connected", in: menu) }
@@ -201,8 +203,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             let font = NSFont.menuFont(ofSize: 0)
             let title = NSMutableAttributedString()
-            let provider = profile.antigravitySnapshotPath != nil
-                ? "google" : (profile.claudeSnapshotPath == nil ? "openai" : "claude")
+            let provider = profile.isGrok ? "grok" : (
+                profile.antigravitySnapshotPath != nil ? "google" : (profile.claudeSnapshotPath == nil ? "openai" : "claude")
+            )
             let darkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let logos = darkMode ? Self.darkProviderLogos : Self.lightProviderLogos
             if let logo = logos[provider] {
@@ -215,7 +218,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             title.append(NSAttributedString(string: profile.label, attributes: [
                 .font: font, .foregroundColor: NSColor.labelColor
             ]))
-            if let snapshot = profile.snapshot, profile.localSnapshotPath == nil {
+            if let snapshot = profile.snapshot, profile.usesCodexCLI {
                 title.append(NSAttributedString(string: "    "))
                 if let credits = accountCreditSummary(snapshot) {
                     title.append(NSAttributedString(string: "\(credits) • ", attributes: [
@@ -241,7 +244,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
             action("Account Details…", #selector(accountDetailsForMenu(_:)), in: manage, id: profile.id)
-            if profile.localSnapshotPath == nil {
+            if profile.isGrok {
+                action("Update Grok Usage…", #selector(reauthenticate(_:)), in: manage, id: profile.id)
+            } else if profile.usesCodexCLI {
                 action("Reauthenticate…", #selector(reauthenticate(_:)), in: manage, id: profile.id)
             }
             action("Remove…", #selector(remove(_:)), in: manage, id: profile.id)
@@ -254,7 +259,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             } else if let failure = failures[profile.id] {
                 info(failure.text, in: menu)
             }
-            if profile.snapshot?.due(interval: interval) == true ||
+            if profile.isGrok, let snapshot = profile.snapshot {
+                info("Manual reading · \(dateText(snapshot.at))", in: menu, color: .secondaryLabelColor)
+            } else if profile.snapshot?.due(interval: interval) == true ||
                 (profile.snapshot != nil && failures[profile.id] != nil) {
                 info("Stale · Showing the last successful reading", in: menu)
             } else if profile.snapshot == nil && jobs[profile.id] == nil && failures[profile.id] == nil {
@@ -460,7 +467,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         var values = [window, week].compactMap { $0 }.map { "\($0.remaining)%" }
         if let mostAvailable { values.insert(mostAvailable.profile.label, at: 0) }
         let stale = profile.map { p in
-            p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
+            !p.isGrok && (p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || (p.usesCodexCLI && cli == nil))
         } ?? false
         let logo = config.menuShowsLogo == false ? nil : statusLogo
         let text = values.joined(separator: " · ") + (stale && !values.isEmpty ? "*" : "")
@@ -538,7 +545,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let now = Date()
         let codexAvailable = cli != nil
         let next = config.profiles.compactMap { profile -> Date? in
-            guard jobs[profile.id] == nil, profile.localSnapshotPath != nil || codexAvailable else { return nil }
+            guard jobs[profile.id] == nil, !profile.isGrok, profile.localSnapshotPath != nil || codexAvailable else { return nil }
             if let failure = failures[profile.id] { return failure.retry == .distantFuture ? nil : failure.retry }
             if profile.localSnapshotPath != nil {
                 return snapshotChecks[profile.id]?.addingTimeInterval(interval) ?? now
@@ -599,7 +606,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         guard !quitPending, jobs[id] == nil, afterJob[id] == nil,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         let binary = cli
-        guard profile.localSnapshotPath != nil || binary != nil else { return }
+        guard !profile.isGrok, profile.localSnapshotPath != nil || binary != nil else { return }
         let job = Job(work: .refresh, status: "Loading allowance…")
         let client = binary.map { Client(binary: $0, storage: storage) }
         if profile.localSnapshotPath != nil { snapshotChecks[id] = Date() }
@@ -646,7 +653,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         guard refreshBatch.isEmpty, !quitPending else { return }
         let now = Date()
         let accounts = config.profiles.filter { profile in
-            guard jobs[profile.id] == nil, afterJob[profile.id] == nil else { return false }
+            guard !profile.isGrok, jobs[profile.id] == nil, afterJob[profile.id] == nil else { return false }
             guard profile.localSnapshotPath != nil || cli != nil else { return false }
             if manual { return true }
             if let failure = failures[profile.id] { return failure.retry <= now }
@@ -660,6 +667,65 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         batchUpdated = false
         if menuIsOpen { menu.update() }
         accounts.forEach { refresh($0.id) }
+    }
+
+    @objc private func addGrok() {
+        guard let label = prompt("Add Grok Account", value: "Grok", button: "Continue") else { return }
+        editGrok(label: label, existing: nil)
+    }
+
+    private func editGrok(label: String, existing: Profile?) {
+        let dialog = NSAlert()
+        dialog.messageText = "Update Grok Usage"
+        dialog.informativeText = "Enter the weekly percentage used from Grok → Settings → Usage."
+        let percentage = NSTextField(string: existing?.snapshot?.windows.first?.used.formatted() ?? "")
+        percentage.placeholderString = "Percentage used (0–100)"
+        percentage.setAccessibilityLabel("Weekly percentage used")
+        let resetLabel = NSTextField(labelWithString: "Reset date and time (optional)")
+        let reset = NSTextField(string: "")
+        reset.placeholderString = "YYYY-MM-DD HH:mm"
+        reset.setAccessibilityLabel("Reset date and time")
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        if let date = existing?.snapshot?.windows.first?.reset {
+            reset.stringValue = formatter.string(from: date)
+        }
+        let fields = NSStackView(views: [percentage, resetLabel, reset])
+        fields.orientation = .vertical
+        fields.alignment = .leading
+        fields.spacing = 8
+        fields.frame = NSRect(x: 0, y: 0, width: 300, height: 78)
+        percentage.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        reset.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        dialog.accessoryView = fields
+        dialog.addButton(withTitle: "Save")
+        dialog.addButton(withTitle: "Cancel")
+        dialog.window.initialFirstResponder = percentage
+        NSApp.activate(ignoringOtherApps: true)
+        guard dialog.runModal() == .alertFirstButtonReturn else { return }
+        let resetText = reset.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let date = formatter.date(from: resetText)
+        guard resetText.isEmpty || date.map(formatter.string(from:)) == resetText else {
+            alert("Invalid reset time", "Enter the reset in local time as YYYY-MM-DD HH:mm.")
+            return
+        }
+        let number = NumberFormatter()
+        number.numberStyle = .decimal
+        guard let used = number.number(from: percentage.stringValue)?.doubleValue,
+              let profile = Profile.grok(id: existing?.id ?? UUID(), label: label,
+                                         usedPercentage: used, reset: date) else {
+            alert("Invalid usage percentage", "Enter a number from 0 to 100.")
+            return
+        }
+        change {
+            if let index = $0.profiles.firstIndex(where: { $0.id == profile.id }) {
+                $0.profiles[index] = profile
+            } else {
+                $0.profiles.append(profile)
+            }
+            $0.lastRefreshed = profile.snapshot?.at
+        }
     }
 
     @objc private func addClaude() { addSnapshotAccount(antigravity: false) }
@@ -730,7 +796,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private func reauthenticateProfile(_ id: UUID) {
         guard loginID == nil, jobs[id]?.work != .remove,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
-        guard profile.localSnapshotPath == nil else { return }
+        if profile.isGrok {
+            editGrok(label: profile.label, existing: profile)
+            return
+        }
+        guard profile.usesCodexCLI else { return }
         beginLogin(id, label: profile.label, existing: true)
     }
 
@@ -899,7 +969,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         let dialog = NSAlert()
         dialog.messageText = "Are you sure you want to remove \(profile.label)?"
-        dialog.informativeText = profile.localSnapshotPath == nil
+        dialog.informativeText = profile.usesCodexCLI
             ? "This deletes the tracker’s cached allowance and its private Codex sign-in."
             : "This removes the account from Usage. Your snapshot file stays on disk."
         dialog.addButton(withTitle: "Cancel")
@@ -908,7 +978,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         guard dialog.runModal() == .alertSecondButtonReturn else { return }
         afterCurrentWork(id) {
             let job = Job(work: .remove, status: "Removing…")
-            self.start(id, job, perform: { if profile.localSnapshotPath == nil { try self.storage.remove(id) } }) { result in
+            self.start(id, job, perform: { if profile.usesCodexCLI { try self.storage.remove(id) } }) { result in
                 do {
                     try result.get()
                     var next = self.config
@@ -1145,7 +1215,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func fillAccountSettings(_ stack: NSStackView) {
-        let intro = NSTextField(labelWithString: "Manage Codex, Claude Code, and Google Antigravity accounts.")
+        let intro = NSTextField(labelWithString: "Manage Codex, Claude Code, Google Antigravity, and Grok accounts.")
         intro.textColor = .secondaryLabelColor
         let refresh = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
         refresh.keyEquivalent = "r"
@@ -1167,7 +1237,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 profileButton("Details…", selector: #selector(accountDetailsForButton(_:)), id: profile.id),
                 profileButton("Remove…", selector: #selector(removeProfileButton(_:)), id: profile.id)
             ]
-            if profile.localSnapshotPath == nil {
+            if profile.isGrok {
+                accountActions.insert(profileButton("Update Grok Usage…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id), at: 2)
+            } else if profile.usesCodexCLI {
                 accountActions.insert(profileButton("Reauthenticate…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id), at: 2)
             }
             let actions = NSStackView(views: accountActions)
@@ -1199,7 +1271,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         }
         let addClaudeAccount = NSButton(title: "Add Claude Account…", target: self, action: #selector(addClaude))
         let addGoogleAccount = NSButton(title: "Add Antigravity Account…", target: self, action: #selector(addAntigravity))
-        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, details]
+        let addGrokAccount = NSButton(title: "Add Grok Account…", target: self, action: #selector(addGrok))
+        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, addGrokAccount, details]
         if !rows.isEmpty {
             let divider = NSBox()
             divider.boxType = .separator
