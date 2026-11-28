@@ -4,9 +4,15 @@ Usage is a native macOS menu bar app and widget for tracking remaining Codex, Cl
 
 [MIT licence](LICENSE) · [Build from source](#build-from-source) · [Contributing](#contributing)
 
-## Install and connect
+Connect an account: [OpenAI Codex](#connect-openai-codex) · [Claude Code](#connect-claude-code) · [Google Antigravity](#connect-google-antigravity)
+
+## Install
 
 Build **Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build uses your Apple Development certificate and is unnotarized. The package targets macOS 14 or later.
+
+## Connect OpenAI Codex
+
+Usage reads account limits from the Codex CLI. Use the CLI bundled with ChatGPT or install Codex separately.
 
 1. Open **Settings → Accounts** and choose **Add Codex Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
