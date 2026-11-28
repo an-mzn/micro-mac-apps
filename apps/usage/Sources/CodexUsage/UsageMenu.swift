@@ -141,13 +141,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             reloadUsageWidget()
             UserDefaults.standard.set(widgetVersion, forKey: versionKey)
         }
-        let icon = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
-            .flatMap { NSImage(contentsOf: $0) }
-        icon?.size = NSSize(width: 18, height: 18)
-        item.button?.image = icon
-            ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
-        item.button?.image?.isTemplate = true
-        item.button?.imagePosition = .imageLeading
         item.button?.target = self
         item.button?.action = #selector(showUsageMenu(_:))
         menu.delegate = self
@@ -433,6 +426,15 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return "\(formatter.string(from: NSDecimalNumber(decimal: decimal)) ?? balance) \(decimal == 1 ? "credit" : "credits")"
     }
 
+    private lazy var statusLogo: NSImage? = {
+        let image = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
+            .flatMap { NSImage(contentsOf: $0) }
+            ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        return image
+    }()
+
     private func updateIcon() {
         let mostAvailable = config.menuShowsMostAvailable == true ? config.mostAvailable : nil
         let profile = mostAvailable?.profile ?? config.profiles.first { $0.id == config.menuProfile }
@@ -445,9 +447,13 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let stale = profile.map { p in
             p.snapshot?.due(interval: interval) == true || failures[p.id] != nil || cli == nil
         } ?? false
-        let title = values.isEmpty ? "" : " " + values.joined(separator: " · ") + (stale ? "*" : "")
+        let logo = config.menuShowsLogo == false ? nil : statusLogo
+        let text = values.joined(separator: " · ") + (stale && !values.isEmpty ? "*" : "")
+        let title = text.isEmpty ? (logo == nil ? "Usage" : "") : (logo == nil ? text : " " + text)
         if let button = item.button {
-            // Align the image-leading title with the surrounding menu bar text.
+            button.image = logo
+            button.imagePosition = logo == nil ? .noImage : .imageLeading
+            // Align the title with the surrounding menu bar text.
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 .font: NSFont.menuBarFont(ofSize: 0),
                 .baselineOffset: -1
@@ -993,6 +999,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 selection.selectItem(at: selection.numberOfItems - 1)
             }
         }
+        let showLogo = NSButton(checkboxWithTitle: "Show logo in menu bar", target: self,
+                                action: #selector(changeMenuLogo(_:)))
+        showLogo.state = config.menuShowsLogo == false ? .off : .on
         let launch = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(changeLaunchAtLogin(_:)))
         launch.state = launchAtLoginEnabled ? .on : .off
         let binary = NSTextField(string: config.binary ?? "")
@@ -1015,6 +1024,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let general = settingsPage([
             fieldRow("Background refresh", interval),
             fieldRow("Menu bar display", selection),
+            showLogo,
             autoSort,
             fieldRow("Sort by", sortOrder),
             resetDisplay,
@@ -1234,6 +1244,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             $0.menuWeeklyWindow = option?.week
             $0.menuShowsMostAvailable = sender.selectedItem?.tag == 1
         }
+    }
+
+    @objc private func changeMenuLogo(_ sender: NSButton) {
+        change { $0.menuShowsLogo = sender.state == .on }
+        sender.state = config.menuShowsLogo == false ? .off : .on
     }
 
     private var launchAtLoginEnabled: Bool {
