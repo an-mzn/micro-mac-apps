@@ -6,9 +6,9 @@ import WidgetKit
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
     private static let expiringResetColor = NSColor(name: nil) { appearance in
         if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            return NSColor(srgbRed: 1, green: 0.68, blue: 0.64, alpha: 1)
+            return NSColor(srgbRed: 1, green: 0.49, blue: 0.45, alpha: 1)
         }
-        return NSColor(srgbRed: 0.65, green: 0.23, blue: 0.21, alpha: 1)
+        return NSColor(srgbRed: 0.75, green: 0.19, blue: 0.16, alpha: 1)
     }
 
     private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
@@ -180,9 +180,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                         .font: font, .foregroundColor: NSColor.tertiaryLabelColor
                     ]))
                 }
-                let resetColor = snapshot.hasBankedResetExpiringSoon() ? Self.expiringResetColor : NSColor.tertiaryLabelColor
+                let expiresSoon = snapshot.hasBankedResetExpiringSoon()
+                let resetColor = expiresSoon ? Self.expiringResetColor : NSColor.tertiaryLabelColor
+                let resetFont = expiresSoon ? NSFont.systemFont(ofSize: font.pointSize, weight: .semibold) : font
                 title.append(NSAttributedString(string: resetSummary(snapshot.bankedResetCount), attributes: [
-                    .font: font, .foregroundColor: resetColor
+                    .font: resetFont, .foregroundColor: resetColor
                 ]))
                 header.attributedTitle = title
             }
