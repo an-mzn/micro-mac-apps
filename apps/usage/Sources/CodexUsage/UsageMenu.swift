@@ -20,9 +20,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let size = NSSize(width: 14, height: 14)
         let raster = NSImage(size: size)
         raster.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: size))
+        let bounds = NSRect(origin: .zero, size: size)
+        image.draw(in: bounds)
+        NSColor.white.setFill()
+        bounds.fill(using: .sourceIn)
         raster.unlockFocus()
-        raster.isTemplate = true
         return raster
     }
 
@@ -193,7 +195,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             if let logo = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo {
                 let attachment = NSTextAttachment()
                 attachment.image = logo
-                attachment.bounds = CGRect(x: 0, y: -2, width: 14, height: 14)
+                attachment.bounds = CGRect(x: 0, y: -3, width: 14, height: 14)
                 title.append(NSAttributedString(attachment: attachment))
                 title.append(NSAttributedString(string: "  "))
             }
