@@ -262,11 +262,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     @objc private func showUsageMenu(_ button: NSStatusBarButton) {
         guard let window = button.window, let screen = window.screen else { return }
         let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
-        // AppKit anchors the content, so leave room for the rounded border above it.
-        let contentInset: CGFloat = 5
-        let gapBelowMenuBar: CGFloat = 2
+        let gapBelowMenuBar: CGFloat = 1.5
         let anchor = NSPoint(x: buttonFrame.minX,
-                             y: screen.visibleFrame.maxY - contentInset - gapBelowMenuBar)
+                             y: screen.visibleFrame.maxY - gapBelowMenuBar)
         button.highlight(true)
         defer { button.highlight(false) }
         menu.popUp(positioning: nil, at: anchor, in: nil)
