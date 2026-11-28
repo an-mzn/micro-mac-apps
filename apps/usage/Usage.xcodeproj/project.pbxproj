@@ -13,6 +13,7 @@
 		33D36A969CAF871995853D5B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F3A09D4A2F18386A0481EC /* Models.swift */; };
 		3855B373C29ACD7D8F6491A2 /* claude.svg in Resources */ = {isa = PBXBuildFile; fileRef = 457FC1D57E8892A4709605DC /* claude.svg */; };
 		4294639FF3A16A39DD21010A /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D7B47ACCAB106014060676F /* main.swift */; };
+		43A7C91E8B5A4E593D002926 /* BillingStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A073D0BE69D086BA4586616B /* BillingStatus.swift */; };
 		4CC3CA2D1C44847FB93D8B38 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 98DC776EA8BF46A86BCFE21B /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5582F9F5F4A00DB815600A4B /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98DC776EA8BF46A86BCFE21B /* UsageCore.framework */; };
 		5631383D2FD15A7B30D072A8 /* UsageWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C378ED9DAB351A619DA7169A /* UsageWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -108,6 +109,7 @@
 		98DC776EA8BF46A86BCFE21B /* UsageCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = UsageCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BF33C6BD6BE8C0DEFF988F8 /* Usage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Usage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9EAF06B622E9F87B1E049DB7 /* usage.svg */ = {isa = PBXFileReference; path = usage.svg; sourceTree = "<group>"; };
+		A073D0BE69D086BA4586616B /* BillingStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillingStatus.swift; sourceTree = "<group>"; };
 		A7F3A09D4A2F18386A0481EC /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AAC6E2D6C46C623CEC00689C /* AntigravityStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityStatus.swift; sourceTree = "<group>"; };
 		B3EB44F854C5D12BE280D4B6 /* google.svg */ = {isa = PBXFileReference; path = google.svg; sourceTree = "<group>"; };
@@ -229,6 +231,7 @@
 			isa = PBXGroup;
 			children = (
 				AAC6E2D6C46C623CEC00689C /* AntigravityStatus.swift */,
+				A073D0BE69D086BA4586616B /* BillingStatus.swift */,
 				F6D9629EE8FDB043B38050F1 /* ClaudeStatus.swift */,
 				DD2FD162F71C0E944B41B2AB /* Client.swift */,
 				A7F3A09D4A2F18386A0481EC /* Models.swift */,
@@ -426,6 +429,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6842D80177A19AF2AAADE860 /* AntigravityStatus.swift in Sources */,
+				43A7C91E8B5A4E593D002926 /* BillingStatus.swift in Sources */,
 				84922BEB835524DC7BD023FA /* ClaudeStatus.swift in Sources */,
 				CD876F4104286DEB3B1FDEE4 /* Client.swift in Sources */,
 				33D36A969CAF871995853D5B /* Models.swift in Sources */,

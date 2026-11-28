@@ -18,6 +18,8 @@ private struct AccountReading: Identifiable {
     let label: String
     let isClaude: Bool
     let isGrok: Bool
+    let billingProvider: BillingStatus?
+    let amounts: [UsageAmount]
     let isAntigravity: Bool
     let quotas: [Allowance]
     let fiveHour: Allowance?
@@ -29,6 +31,8 @@ private struct AccountReading: Identifiable {
         label = profile.label
         isClaude = profile.claudeSnapshotPath != nil
         isGrok = profile.isGrok
+        billingProvider = profile.billingProvider
+        amounts = Array((profile.snapshot?.amounts ?? []).prefix(2))
         isAntigravity = profile.antigravitySnapshotPath != nil
         resetCount = profile.snapshot?.bankedResetCount
         let windows = profile.snapshot?.windows ?? []
@@ -47,6 +51,8 @@ private struct AccountReading: Identifiable {
         self.label = label
         self.isClaude = false
         self.isGrok = false
+        self.billingProvider = nil
+        self.amounts = []
         self.isAntigravity = false
         self.quotas = []
         self.fiveHour = fiveHour
@@ -158,7 +164,13 @@ private struct UsageWidgetView: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            if let account = entry.accounts.first, account.isAntigravity {
+            if let account = entry.accounts.first, account.billingProvider != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    accountName(account, size: 13)
+                    billingSummary(account)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else if let account = entry.accounts.first, account.isAntigravity {
                 VStack(alignment: .leading, spacing: 6) {
                     accountName(account, size: 13)
                     quotaSummary(account)
@@ -189,7 +201,9 @@ private struct UsageWidgetView: View {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         VStack(alignment: .leading, spacing: 5) {
                             accountName(account, size: 12)
-                            if account.isAntigravity {
+                            if account.billingProvider != nil {
+                                billingSummary(account)
+                            } else if account.isAntigravity {
                                 quotaSummary(account)
                             } else {
                                 HStack(spacing: 5) {
@@ -232,7 +246,9 @@ private struct UsageWidgetView: View {
                                 }
                             }
                             .frame(width: 58, alignment: .leading)
-                            if account.isAntigravity {
+                            if account.billingProvider != nil {
+                                billingSummary(account)
+                            } else if account.isAntigravity {
                                 ForEach(account.quotas) { quota in
                                     allowanceColumn(quota, title: quota.title)
                                 }
@@ -258,6 +274,23 @@ private struct UsageWidgetView: View {
             }
         }.padding(16)
     }
+    private func billingSummary(_ account: AccountReading) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(account.amounts.indices, id: \.self) { index in
+                let amount = account.amounts[index]
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(amount.label)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    Text(amount.displayValue)
+                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            }
+        }
+    }
+
     private func quotaSummary(_ account: AccountReading) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             ForEach(account.quotas) { quota in
@@ -290,9 +323,11 @@ private struct UsageWidgetView: View {
 
     private func accountName(_ account: AccountReading, size: CGFloat) -> some View {
         HStack(spacing: 4) {
-            let logo = account.isGrok ? Self.grokIcon : (
+            let logo = account.billingProvider.flatMap { provider in
+                NSImage(systemSymbolName: provider == .copilot ? "c.circle" : "d.circle", accessibilityDescription: nil)
+            } ?? (account.isGrok ? Self.grokIcon : (
                 account.isAntigravity ? Self.googleLogo : (account.isClaude ? Self.claudeLogo : Self.openAILogo)
-            )
+            ))
             if let logo {
                 Image(nsImage: logo)
                     .renderingMode(.template)

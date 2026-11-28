@@ -138,16 +138,18 @@ public struct Snapshot: Codable, Equatable {
     public let unlimitedCredits: Bool?
     public let bankedResetCount: Int?
     public let bankedResetExpirations: [Date]?
+    public let amounts: [UsageAmount]?
 
     public init(at: Date = Date(), windows: [Window], creditBalance: String? = nil,
                 unlimitedCredits: Bool? = nil, bankedResetCount: Int? = nil,
-                bankedResetExpirations: [Date]? = nil) {
+                bankedResetExpirations: [Date]? = nil, amounts: [UsageAmount]? = nil) {
         self.at = at
         self.windows = windows
         self.creditBalance = creditBalance
         self.unlimitedCredits = unlimitedCredits
         self.bankedResetCount = bankedResetCount
         self.bankedResetExpirations = bankedResetExpirations
+        self.amounts = amounts
     }
 
     public func hasBankedResetExpiringSoon(now: Date = Date()) -> Bool {
@@ -186,15 +188,18 @@ public struct Profile: Codable, Equatable, Identifiable {
                        snapshot: Snapshot(windows: [window]))
     }
 
-    public var localSnapshotPath: String? { antigravitySnapshotPath ?? claudeSnapshotPath }
+    public var billingSnapshotPath: String?
+    public var billingProvider: BillingStatus? { BillingStatus(rawValue: identity.account.type) }
+    public var localSnapshotPath: String? { billingSnapshotPath ?? antigravitySnapshotPath ?? claudeSnapshotPath }
     public var snapshot: Snapshot?
 
-    public init(id: UUID, label: String, identity: Identity, snapshot: Snapshot? = nil, claudeSnapshotPath: String? = nil, antigravitySnapshotPath: String? = nil) {
+    public init(id: UUID, label: String, identity: Identity, snapshot: Snapshot? = nil, claudeSnapshotPath: String? = nil, antigravitySnapshotPath: String? = nil, billingSnapshotPath: String? = nil) {
         self.id = id
         self.label = label
         self.identity = identity
         self.claudeSnapshotPath = claudeSnapshotPath
         self.antigravitySnapshotPath = antigravitySnapshotPath
+        self.billingSnapshotPath = billingSnapshotPath
         self.snapshot = snapshot
     }
 }

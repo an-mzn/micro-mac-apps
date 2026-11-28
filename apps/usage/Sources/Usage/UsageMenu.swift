@@ -16,16 +16,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     private static func providerLogos(tint: NSColor) -> [String: NSImage] {
         var logos: [String: NSImage] = [:]
-        for name in ["openai", "claude", "google", "grok"] {
+        for name in ["openai", "claude", "google", "grok", "copilot", "deepseek"] {
             logos[name] = providerLogo(named: name, tint: tint)
         }
         return logos
     }
 
     private static func providerLogo(named name: String, tint: NSColor) -> NSImage? {
-        let source = name == "grok"
-            ? NSImage(systemSymbolName: "g.circle", accessibilityDescription: "Grok")
-            : Bundle.main.url(forResource: name, withExtension: "svg").flatMap { NSImage(contentsOf: $0) }
+        let symbols = ["grok": "g.circle", "copilot": "c.circle", "deepseek": "d.circle"]
+        let source = symbols[name].flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+            ?? Bundle.main.url(forResource: name, withExtension: "svg").flatMap { NSImage(contentsOf: $0) }
         guard let image = source else { return nil }
         let size = NSSize(width: 14, height: 14)
         let raster = NSImage(size: size)
@@ -79,6 +79,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let weekly: WidgetAllowanceState
         let resetCount: Int?
         let googleQuotas: [Window]
+        let amounts: [UsageAmount]
     }
     private var jobs: [UUID: Job] = [:]
     private var refreshBatch: Set<UUID> = []
@@ -203,9 +204,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             let font = NSFont.menuFont(ofSize: 0)
             let title = NSMutableAttributedString()
-            let provider = profile.isGrok ? "grok" : (
+            let provider = profile.billingProvider?.rawValue ?? (profile.isGrok ? "grok" : (
                 profile.antigravitySnapshotPath != nil ? "google" : (profile.claudeSnapshotPath == nil ? "openai" : "claude")
-            )
+            ))
             let darkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let logos = darkMode ? Self.darkProviderLogos : Self.lightProviderLogos
             if let logo = logos[provider] {
@@ -251,7 +252,13 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             }
             action("Remove…", #selector(remove(_:)), in: manage, id: profile.id)
             if let snapshot = profile.snapshot {
-                if snapshot.windows.isEmpty { info("No allowance windows returned", in: menu) }
+                if let amounts = snapshot.amounts {
+                    for amount in amounts {
+                        info("\(amount.label) · \(amount.displayValue)", in: menu)
+                    }
+                } else if snapshot.windows.isEmpty {
+                    info("No allowance windows returned", in: menu)
+                }
                 for window in snapshot.windows { usageRow(window, in: menu) }
             }
             if let job = jobs[profile.id], job.work != .refresh {
@@ -521,7 +528,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 fiveHour: WidgetAllowanceState(remaining: fiveHour?.remaining, reset: fiveHour?.reset),
                 weekly: WidgetAllowanceState(remaining: weekly?.remaining, reset: weekly?.reset),
                 resetCount: profile.snapshot?.bankedResetCount,
-                googleQuotas: profile.antigravitySnapshotPath == nil ? [] : Array(windows.prefix(2))
+                googleQuotas: profile.antigravitySnapshotPath == nil ? [] : Array(windows.prefix(2)),
+                amounts: Array((profile.snapshot?.amounts ?? []).prefix(2))
             )
         }
     }
@@ -611,6 +619,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let client = binary.map { Client(binary: $0, storage: storage) }
         if profile.localSnapshotPath != nil { snapshotChecks[id] = Date() }
         start(id, job, perform: {
+            if let provider = profile.billingProvider, let path = profile.billingSnapshotPath {
+                return (provider.identity, try provider.read(path: path))
+            }
             if let path = profile.antigravitySnapshotPath {
                 return (AntigravityStatus.identity, try AntigravityStatus.read(path: path))
             }
@@ -730,12 +741,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
 
     @objc private func addClaude() { addSnapshotAccount(antigravity: false) }
     @objc private func addAntigravity() { addSnapshotAccount(antigravity: true) }
+    @objc private func addCopilot() { addSnapshotAccount(antigravity: false, billing: .copilot) }
+    @objc private func addDeepSeek() { addSnapshotAccount(antigravity: false, billing: .deepseek) }
 
-    private func addSnapshotAccount(antigravity: Bool) {
-        let provider = antigravity ? "Antigravity" : "Claude Code"
+    private func addSnapshotAccount(antigravity: Bool, billing: BillingStatus? = nil) {
+        let provider = billing?.title ?? (antigravity ? "Antigravity" : "Claude Code")
         guard let label = prompt("Add \(provider) Account", value: provider, button: "Choose Snapshot…") else { return }
         let panel = NSOpenPanel()
-        panel.message = "Choose the JSON snapshot written by your \(provider) status line."
+        panel.message = "Choose the JSON snapshot for \(provider)."
         panel.canChooseDirectories = false
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -745,14 +758,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             return
         }
         do {
-            let snapshot = try antigravity ? AntigravityStatus.read(path: path) : ClaudeStatus.read(path: path)
-            let profile = Profile(id: UUID(), label: label,
+            let profile: Profile
+            if let billing {
+                profile = Profile(id: UUID(), label: label, identity: billing.identity,
+                                  snapshot: try billing.read(path: path), billingSnapshotPath: path)
+            } else {
+                let snapshot = try antigravity ? AntigravityStatus.read(path: path) : ClaudeStatus.read(path: path)
+                profile = Profile(id: UUID(), label: label,
                                   identity: antigravity ? AntigravityStatus.identity : ClaudeStatus.identity,
                                   snapshot: snapshot, claudeSnapshotPath: antigravity ? nil : path,
                                   antigravitySnapshotPath: antigravity ? path : nil)
+            }
             change { $0.profiles.append(profile) }
         } catch {
-            alert("Could not read \(provider) limits", "Choose a status line snapshot containing a reported quota percentage.")
+            alert("Could not read \(provider) limits", "Choose a valid snapshot generated for this provider.")
         }
     }
 
@@ -1215,7 +1234,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func fillAccountSettings(_ stack: NSStackView) {
-        let intro = NSTextField(labelWithString: "Manage Codex, Claude Code, Google Antigravity, and Grok accounts.")
+        let intro = NSTextField(labelWithString: "Manage connected AI accounts and usage snapshots.")
         intro.textColor = .secondaryLabelColor
         let refresh = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
         refresh.keyEquivalent = "r"
@@ -1272,7 +1291,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let addClaudeAccount = NSButton(title: "Add Claude Account…", target: self, action: #selector(addClaude))
         let addGoogleAccount = NSButton(title: "Add Antigravity Account…", target: self, action: #selector(addAntigravity))
         let addGrokAccount = NSButton(title: "Add Grok Account…", target: self, action: #selector(addGrok))
-        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, addGrokAccount, details]
+        let addCopilotAccount = NSButton(title: "Add Copilot Account…", target: self, action: #selector(addCopilot))
+        let addDeepSeekAccount = NSButton(title: "Add DeepSeek Account…", target: self, action: #selector(addDeepSeek))
+        let addBilling = NSStackView(views: [addCopilotAccount, addDeepSeekAccount])
+        addBilling.orientation = .horizontal
+        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, addGrokAccount, addBilling, details]
         if !rows.isEmpty {
             let divider = NSBox()
             divider.boxType = .separator

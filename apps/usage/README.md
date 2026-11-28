@@ -4,7 +4,7 @@ Usage is a native macOS menu bar app and widget for tracking remaining Codex, Cl
 
 [MIT licence](LICENSE) · [Build from source](#build-from-source) · [Contributing](#contributing)
 
-Connect an account: [OpenAI Codex](#connect-openai-codex) · [Claude Code](#connect-claude-code) · [Google Antigravity](#connect-google-antigravity) · [Grok](#add-grok)
+Connect an account: [OpenAI Codex](#connect-openai-codex) · [Claude Code](#connect-claude-code) · [Google Antigravity](#connect-google-antigravity) · [Grok](#add-grok) · [GitHub Copilot](#connect-github-copilot) · [DeepSeek](#connect-deepseek)
 
 ## Install
 
@@ -83,6 +83,41 @@ Choose **Update Grok Usage…** from the account menu or Accounts settings to
 enter a fresh reading. Grok entries are manual and do not participate in automatic
 refreshes. The documented Grok Build status line exposes session data rather
 than the subscription-wide weekly allowance.
+
+## Connect GitHub Copilot
+
+Create a fine-grained GitHub token with **Plan: Read** user permission. This
+integration covers Copilot billed directly to your personal GitHub account.
+From the Usage project directory, run:
+
+```sh
+python3 scripts/billing-snapshot.py copilot ~/usage-snapshots/copilot.json --username YOUR_GITHUB_USERNAME
+```
+
+The helper prompts for the token without echoing it. Add
+`--premium-requests` if your plan uses GitHub’s premium request report.
+Then choose **Settings → Accounts → Add Copilot Account…** and select the JSON
+file. Usage shows gross month-to-date Copilot AI credits or premium requests.
+The billing report does not establish your percentage remaining.
+[GitHub billing API](https://docs.github.com/en/rest/billing/usage)
+
+## Connect DeepSeek
+
+From the Usage project directory, run:
+
+```sh
+python3 scripts/billing-snapshot.py deepseek ~/usage-snapshots/deepseek.json
+```
+
+Enter your DeepSeek API key when prompted, then add the generated file from
+**Settings → Accounts → Add DeepSeek Account…**. Usage shows the available API
+balance for each reported currency. This does not measure DeepSeek chat limits.
+[DeepSeek balance API](https://api-docs.deepseek.com/api/get-user-balance/)
+
+For either provider, rerun the same command to update the snapshot, then use
+**Refresh All** to read it immediately. The helper writes only the provider,
+labels, and amounts to the file. It also accepts `GH_TOKEN` or
+`DEEPSEEK_API_KEY` from the environment for unattended use.
 
 ## Refresh and settings
 
