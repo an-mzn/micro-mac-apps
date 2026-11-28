@@ -11,6 +11,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return NSColor(srgbRed: 0.75, green: 0.19, blue: 0.16, alpha: 1)
     }
 
+    private static let openAILogo = providerLogo(named: "openai")
+    private static let claudeLogo = providerLogo(named: "claude")
+
+    private static func providerLogo(named name: String) -> NSImage? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "svg"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 14, height: 14)
+        image.isTemplate = true
+        return image
+    }
+
     private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
         ?? "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
@@ -173,6 +184,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             menu.addItem(.separator())
             let manage = NSMenu()
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
+            header.image = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo
             if let snapshot = profile.snapshot, profile.claudeSnapshotPath == nil {
                 let font = NSFont.menuFont(ofSize: 0)
                 let title = NSMutableAttributedString(string: "\(profile.label)    ", attributes: [
