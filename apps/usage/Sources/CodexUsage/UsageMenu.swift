@@ -17,9 +17,13 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private static func providerLogo(named name: String) -> NSImage? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "svg"),
               let image = NSImage(contentsOf: url) else { return nil }
-        image.size = NSSize(width: 14, height: 14)
-        image.isTemplate = true
-        return image
+        let size = NSSize(width: 14, height: 14)
+        let raster = NSImage(size: size)
+        raster.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: size))
+        raster.unlockFocus()
+        raster.isTemplate = true
+        return raster
     }
 
     private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
@@ -184,7 +188,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             menu.addItem(.separator())
             let manage = NSMenu()
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
-            header.image = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo
             if let snapshot = profile.snapshot, profile.claudeSnapshotPath == nil {
                 let font = NSFont.menuFont(ofSize: 0)
                 let title = NSMutableAttributedString(string: "\(profile.label)    ", attributes: [
@@ -211,6 +214,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 header.attributedTitle = title
             }
             header.submenu = manage
+            header.image = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo
             menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
             action("Account Details…", #selector(accountDetailsForMenu(_:)), in: manage, id: profile.id)
