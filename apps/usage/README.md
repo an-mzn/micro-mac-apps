@@ -74,9 +74,9 @@ Use **Refresh All** for an immediate shared refresh from the menu or Settings. T
 
 ## Profile storage and removal
 
-Codex stores each profile’s authentication inside its own private `CODEX_HOME` at `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`. The app explicitly sets that home for every App Server process, uses Codex’s file credential store, and excludes inherited credential environment variables. The Codex process may also initialize its own runtime state and diagnostics in that home. The tracker’s `settings.json` stores labels, documented account context, preferences, and the latest successful allowance for each profile. It never stores credentials in that file. The app sends no prompts or transcript requests and uses the documented Account API.
+Codex stores each profile’s authentication inside its own private `CODEX_HOME` at `~/Library/Application Support/Usage/Profiles/<UUID>/`. The app explicitly sets that home for every App Server process, uses Codex’s file credential store, and excludes inherited credential environment variables. The Codex process may also initialize its own runtime state and diagnostics in that home. On upgrade, Usage moves its existing local profiles to this location before loading your accounts. The tracker’s `settings.json` stores labels, documented account context, preferences, and the latest successful allowance for each profile. It never stores credentials in that file. The app sends no prompts or transcript requests and uses the documented Account API.
 
-**Remove…** in a profile submenu asks for confirmation, cancels and reaps any active refresh, then removes the validated profile directory and its cached reading. To uninstall, turn off launch at login if enabled, quit the menu bar app, and move it to the Trash. Delete `~/Library/Application Support/Codex Usage` if you also want to discard all tracker profiles and cached readings.
+**Remove…** in a profile submenu asks for confirmation, cancels and reaps any active refresh, then removes the validated profile directory and its cached reading. To uninstall, turn off launch at login if enabled, quit the menu bar app, and move it to the Trash. Delete `~/Library/Application Support/Usage` if you also want to discard all tracker profiles and cached readings.
 
 ## Build from source
 
@@ -92,7 +92,7 @@ USAGE_SIGNING_IDENTITY='<SHA-1 shown next to your Apple Development certificate>
 open dist/Usage.app
 ```
 
-The script writes the signed app and its WidgetKit extension to `dist/Usage.app`. Pass an output directory as the first argument to build elsewhere. It reads the certificate’s team ID and configures the same team-prefixed macOS app group in the app and widget. No source edits are needed. Profile authentication stays under `~/Library/Application Support/Codex Usage/Profiles/<UUID>/`; the shared group holds cached settings and allowance data.
+The script writes the signed app and its WidgetKit extension to `dist/Usage.app`. Pass an output directory as the first argument to build elsewhere. It reads the certificate’s team ID and configures the same team-prefixed macOS app group in the app and widget. No source edits are needed. Profile authentication stays under `~/Library/Application Support/Usage/Profiles/<UUID>/`; the shared group holds cached settings and allowance data.
 
 Eight Release tests passed. The fixtures cover concurrent profiles with the same email, nullable and differing windows, automatic 5-hour and weekly comparison, independent failures, unchanged cache writes, stale eligibility, a single Codex-managed token refresh on an authentication error, malformed output, process exit, timeout, cancellation, removal, path validation, and per-process environment isolation. The fixture CLI requires Python 3 from the installed Xcode command-line tools. Neither the runtime app nor its packaging needs Python.
 

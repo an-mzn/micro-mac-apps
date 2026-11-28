@@ -123,9 +123,12 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return (Double(100 - remaining), nextReset)
     }
 
+    private var applicationSupport: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    }
+
     private func makeStorage() -> Storage {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Codex Usage", isDirectory: true)
+        let support = applicationSupport.appendingPathComponent("Usage", isDirectory: true)
         if let shared = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
             do {
                 try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true,
@@ -140,7 +143,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        do { config = try storage.load() }
+        do {
+            try storage.migrateLocalStorage(from: applicationSupport.appendingPathComponent("Codex Usage", isDirectory: true))
+            config = try storage.load()
+        }
         catch { storageProblem = true; loadFailed = true }
         let widgetVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
         let versionKey = "widgetTimelineBundleVersion"

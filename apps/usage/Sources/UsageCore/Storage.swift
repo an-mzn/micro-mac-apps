@@ -10,17 +10,28 @@ public struct Storage {
     }
 
     private var file: URL { root.appendingPathComponent("settings.json") }
-    private let legacyRoot = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/Codex Usage", isDirectory: true)
-    private var legacyFile: URL { legacyRoot.appendingPathComponent("settings.json") }
+    private var localSettings: URL { homeRoot.appendingPathComponent("settings.json") }
+
+    public func migrateLocalStorage(from legacy: URL) throws {
+        let source = legacy.standardizedFileURL
+        let manager = FileManager.default
+        do {
+            _ = try manager.attributesOfItem(atPath: source.path)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return
+        }
+        try prepare(source)
+        // The move is atomic on the same volume and fails if the destination exists.
+        try manager.moveItem(at: source, to: homeRoot)
+    }
 
     public func load() throws -> Configuration {
         try prepare(root)
         do {
             return try JSONDecoder().decode(Configuration.self, from: Data(contentsOf: file))
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            if root != legacyRoot, FileManager.default.fileExists(atPath: legacyFile.path),
-               let legacy = try? JSONDecoder().decode(Configuration.self, from: Data(contentsOf: legacyFile)) {
+            if root != homeRoot, FileManager.default.fileExists(atPath: localSettings.path) {
+                let legacy = try JSONDecoder().decode(Configuration.self, from: Data(contentsOf: localSettings))
                 try save(legacy)
                 return legacy
             }
