@@ -6,9 +6,9 @@ import WidgetKit
 final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate {
     private static let expiringResetColor = NSColor(name: nil) { appearance in
         if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            return NSColor(srgbRed: 1, green: 0.84, blue: 0.82, alpha: 1)
+            return NSColor(srgbRed: 1, green: 0.68, blue: 0.64, alpha: 1)
         }
-        return NSColor(srgbRed: 0.53, green: 0.25, blue: 0.24, alpha: 1)
+        return NSColor(srgbRed: 0.65, green: 0.23, blue: 0.21, alpha: 1)
     }
 
     private let appGroup = (Bundle.main.object(forInfoDictionaryKey: "UsageAppGroup") as? String)
