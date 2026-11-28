@@ -1293,9 +1293,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let addGrokAccount = NSButton(title: "Add Grok Account…", target: self, action: #selector(addGrok))
         let addCopilotAccount = NSButton(title: "Add Copilot Account…", target: self, action: #selector(addCopilot))
         let addDeepSeekAccount = NSButton(title: "Add DeepSeek Account…", target: self, action: #selector(addDeepSeek))
-        let addBilling = NSStackView(views: [addCopilotAccount, addDeepSeekAccount])
-        addBilling.orientation = .horizontal
-        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, addGrokAccount, addBilling, details]
+        let addAccounts = AccountButtonFlow([
+            addAccount, addClaudeAccount, addGoogleAccount, addGrokAccount, addCopilotAccount, addDeepSeekAccount
+        ])
+        addAccounts.translatesAutoresizingMaskIntoConstraints = false
+        var content: [NSView] = [intro, refresh, addAccounts, details]
         if !rows.isEmpty {
             let divider = NSBox()
             divider.boxType = .separator
@@ -1307,6 +1309,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             content.append(empty)
         }
         content.forEach { stack.addArrangedSubview($0) }
+        addAccounts.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 
     private func moveProfile(_ source: UUID, to destination: UUID) {
@@ -1548,5 +1551,59 @@ private final class RefreshMenuRow: NSView {
         let highlight = NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 2),
                                      xRadius: 6, yRadius: 6)
         highlight.fill()
+    }
+}
+
+
+private final class AccountButtonFlow: NSView {
+    private let buttons: [NSButton]
+    private let spacing: CGFloat = 8
+    private var lastLayoutWidth: CGFloat = 0
+
+    init(_ buttons: [NSButton]) {
+        self.buttons = buttons
+        super.init(frame: .zero)
+        buttons.forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric,
+               height: arrange(width: bounds.width > 0 ? bounds.width : 452, place: false))
+    }
+
+    override func layout() {
+        super.layout()
+        let width = bounds.width
+        guard width > 0 else { return }
+        _ = arrange(width: width, place: true)
+        if width != lastLayoutWidth {
+            lastLayoutWidth = width
+            invalidateIntrinsicContentSize()
+        }
+    }
+
+    private func arrange(width: CGFloat, place: Bool) -> CGFloat {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for button in buttons {
+            let size = button.intrinsicContentSize
+            let buttonWidth = min(ceil(size.width), width)
+            if x > 0, x + buttonWidth > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            if place {
+                button.frame = NSRect(x: x, y: y, width: buttonWidth, height: size.height)
+            }
+            x += buttonWidth + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return y + rowHeight
     }
 }
