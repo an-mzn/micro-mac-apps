@@ -146,8 +146,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeading
-        item.button?.target = self
-        item.button?.action = #selector(showUsageMenu(_:))
+        item.menu = menu
         menu.delegate = self
         updateIcon()
         let center = NSWorkspace.shared.notificationCenter
@@ -257,14 +256,6 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         }
         action("Settings…", #selector(settings), in: menu, key: ",")
         action("Quit Usage", #selector(quit), in: menu, key: "q")
-    }
-
-    @objc private func showUsageMenu(_ button: NSStatusBarButton) {
-        let bounds = button.bounds
-        let below = button.isFlipped ? bounds.maxY + 1 : bounds.minY - 1
-        button.highlight(true)
-        defer { button.highlight(false) }
-        menu.popUp(positioning: nil, at: NSPoint(x: bounds.minX, y: below), in: button)
     }
 
     func menuWillOpen(_ menu: NSMenu) {
