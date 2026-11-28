@@ -16,6 +16,7 @@ private struct Allowance: Identifiable {
 private struct AccountReading: Identifiable {
     let id: UUID
     let label: String
+    let isClaude: Bool
     let fiveHour: Allowance?
     let weekly: Allowance?
     let resetCount: Int?
@@ -23,6 +24,7 @@ private struct AccountReading: Identifiable {
     init(profile: Profile) {
         id = profile.id
         label = profile.label
+        isClaude = profile.claudeSnapshotPath != nil
         resetCount = profile.snapshot?.bankedResetCount
         let windows = profile.snapshot?.windows ?? []
         fiveHour = windows.first(where: { $0.minutes == 300 }).map {
@@ -35,6 +37,7 @@ private struct AccountReading: Identifiable {
     init(id: UUID, label: String, fiveHour: Allowance?, weekly: Allowance?) {
         self.id = id
         self.label = label
+        self.isClaude = false
         self.fiveHour = fiveHour
         self.weekly = weekly
         self.resetCount = nil
@@ -147,8 +150,7 @@ private struct UsageWidgetView: View {
                 HStack(alignment: .center, spacing: 16) {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(account.label).font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .lineLimit(1).minimumScaleFactor(0.8)
+                        accountName(account, size: 13)
                         compactAllowance(account.fiveHour, title: "5h")
                         compactAllowance(account.weekly, title: "Wk")
                     }.frame(maxWidth: .infinity, alignment: .leading)
@@ -168,9 +170,7 @@ private struct UsageWidgetView: View {
                 HStack(alignment: .top, spacing: 10) {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(account.label)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
+                            accountName(account, size: 12)
                             HStack(spacing: 5) {
                                 SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 30)
                                 VStack(alignment: .leading, spacing: 2) {
@@ -201,9 +201,7 @@ private struct UsageWidgetView: View {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         HStack(spacing: 10) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(account.label)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .lineLimit(1).minimumScaleFactor(0.75)
+                                accountName(account, size: 13)
                                 if let count = account.resetCount, count >= 0 {
                                     Text(count == 1 ? "1 reset" : "\(count) resets")
                                         .font(.system(size: 10, weight: .medium))
@@ -232,6 +230,33 @@ private struct UsageWidgetView: View {
             }
         }.padding(16)
     }
+    private static let openAILogo = providerLogo("openai")
+    private static let claudeLogo = providerLogo("claude")
+
+    private static func providerLogo(_ name: String) -> NSImage? {
+        Bundle.main.url(forResource: name, withExtension: "svg")
+            .flatMap { NSImage(contentsOf: $0) }
+    }
+
+    private func accountName(_ account: AccountReading, size: CGFloat) -> some View {
+        HStack(spacing: 4) {
+            if let logo = account.isClaude ? Self.claudeLogo : Self.openAILogo {
+                Image(nsImage: logo)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 11, height: 11)
+                    .foregroundStyle(.white)
+                    .offset(y: 1)
+                    .accessibilityHidden(true)
+            }
+            Text(account.label)
+                .font(.system(size: size, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
     private var header: some View {
         HStack(spacing: 6) {
             if let logo = Self.logo {

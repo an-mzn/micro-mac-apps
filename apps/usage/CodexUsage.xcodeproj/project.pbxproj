@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01274551E845605B3EEC4EF5 /* openai.svg in Resources */ = {isa = PBXBuildFile; fileRef = 82F759E49C51BFDDBB2D020A /* openai.svg */; };
 		198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */ = {isa = PBXBuildFile; fileRef = 483FFECF96BC256973FF108F /* codex-usage.svg */; };
 		2E785F238E3D570BB34C4846 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
+		3F2D10ABC077C2CDEFE40D8B /* claude.svg in Resources */ = {isa = PBXBuildFile; fileRef = 5EAF315AEAB4C24786E2782D /* claude.svg */; };
 		4757B1560A531E6E905CC2D8 /* UsageMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42C7DF564F33A6868893451 /* UsageMenu.swift */; };
 		5A0FAE2926445B13D14DA707 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D7CFA9AC9E92EF6D15D728 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D493C25C602897BC1EEC4FF /* Models.swift */; };
@@ -365,7 +367,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3F2D10ABC077C2CDEFE40D8B /* claude.svg in Resources */,
 				8DFEF03A4A1335C9F1E7E683 /* codex-usage.svg in Resources */,
+				01274551E845605B3EEC4EF5 /* openai.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
