@@ -292,19 +292,28 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         last.font = .menuFont(ofSize: 0)
         last.textColor = .tertiaryLabelColor
         last.alignment = .right
+        let shortcut = NSTextField(labelWithString: "⌘R")
+        shortcut.font = .menuFont(ofSize: 0)
+        shortcut.textColor = .tertiaryLabelColor
+        shortcut.setContentCompressionResistancePriority(.required, for: .horizontal)
         let row = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
         row.addSubview(title)
         row.addSubview(last)
+        row.addSubview(shortcut)
         title.translatesAutoresizingMaskIntoConstraints = false
         last.translatesAutoresizingMaskIntoConstraints = false
+        shortcut.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             title.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 14),
             title.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             last.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 12),
-            last.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -14),
+            last.trailingAnchor.constraint(equalTo: shortcut.leadingAnchor, constant: -10),
+            shortcut.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -14),
+            shortcut.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             last.centerYAnchor.constraint(equalTo: row.centerYAnchor)
         ])
-        let entry = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let entry = NSMenuItem(title: "Refresh All", action: #selector(refreshAll), keyEquivalent: "r")
+        entry.target = self
         entry.view = row
         menu.addItem(entry)
     }
