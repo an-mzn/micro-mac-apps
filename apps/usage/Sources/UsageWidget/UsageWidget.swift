@@ -139,6 +139,7 @@ private struct UsageWidgetView: View {
     private static let logo = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
         .flatMap { NSImage(contentsOf: $0) }
 
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.widgetFamily) private var family
     let entry: UsageEntry
     var body: some View {
@@ -292,7 +293,7 @@ private struct UsageWidgetView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 11, height: 11)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                     .offset(y: 1)
                     .accessibilityHidden(true)
             }

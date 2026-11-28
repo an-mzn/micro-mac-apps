@@ -11,11 +11,18 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         return NSColor(srgbRed: 0.75, green: 0.19, blue: 0.16, alpha: 1)
     }
 
-    private static let openAILogo = providerLogo(named: "openai")
-    private static let googleLogo = providerLogo(named: "google")
-    private static let claudeLogo = providerLogo(named: "claude")
+    private static let lightProviderLogos = providerLogos(tint: .black)
+    private static let darkProviderLogos = providerLogos(tint: .white)
 
-    private static func providerLogo(named name: String) -> NSImage? {
+    private static func providerLogos(tint: NSColor) -> [String: NSImage] {
+        var logos: [String: NSImage] = [:]
+        for name in ["openai", "claude", "google"] {
+            logos[name] = providerLogo(named: name, tint: tint)
+        }
+        return logos
+    }
+
+    private static func providerLogo(named name: String, tint: NSColor) -> NSImage? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "svg"),
               let image = NSImage(contentsOf: url) else { return nil }
         let size = NSSize(width: 14, height: 14)
@@ -23,7 +30,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         raster.lockFocus()
         let bounds = NSRect(origin: .zero, size: size)
         image.draw(in: bounds)
-        NSColor.white.setFill()
+        tint.setFill()
         bounds.fill(using: .sourceIn)
         raster.unlockFocus()
         return raster
@@ -188,9 +195,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             let font = NSFont.menuFont(ofSize: 0)
             let title = NSMutableAttributedString()
-            let logo = profile.antigravitySnapshotPath != nil
-                ? Self.googleLogo : (profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo)
-            if let logo {
+            let provider = profile.antigravitySnapshotPath != nil
+                ? "google" : (profile.claudeSnapshotPath == nil ? "openai" : "claude")
+            let darkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let logos = darkMode ? Self.darkProviderLogos : Self.lightProviderLogos
+            if let logo = logos[provider] {
                 let attachment = NSTextAttachment()
                 attachment.image = logo
                 attachment.bounds = CGRect(x: 0, y: -3, width: 14, height: 14)
