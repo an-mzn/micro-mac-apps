@@ -1,6 +1,8 @@
 # Usage
 
-A native menu bar app for comparing ChatGPT-backed Codex allowance across accounts and workspaces. The menu shows the last successful reading for each profile, including the windows and bucket names returned by Codex.
+Usage is a native macOS menu bar app and widget for tracking remaining Codex and Claude Code allowance across accounts. It shows the last successful reading for each profile.
+
+[MIT licence](LICENSE) · [Build from source](#build-from-source) · [Contributing](#contributing)
 
 ## Install and connect
 
@@ -45,7 +47,7 @@ the account from Usage leaves your Claude Code settings and file in place.
 
 ## Refresh and settings
 
-Cached readings appear immediately in the menu and widget. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile. The widget supports small and medium macOS widget sizes: the small widget shows the first connected account, and the medium widget shows accounts side by side. Both show the 5-hour and weekly remaining percentage in circular gauges inspired by Apple’s battery rings. Widget updates use the same background refresh cadence and cached values; they do not trigger live account requests.
+Cached readings appear immediately in the menu and widget. Background refresh defaults to 15 minutes. Settings offers intervals from 5 to 120 minutes. An expired reset can make a profile eligible sooner, and opening the menu checks for due readings. Reset times never change the displayed percentage without a successful read. The scheduler uses a single one-shot timer with tolerance, backs off failed requests, adds a delay after wake, and pauses automatic reads in Low Power Mode. Refresh runs with at most two active operations and at most one operation per profile. The small widget shows the first account. The medium and large widgets show up to three accounts. Widgets use cached readings and refresh when displayed data changes.
 
 Use **Refresh All** for an immediate shared refresh from the menu or Settings. The menu row shows the last-refreshed time. When an automatic refresh is due, the app refreshes eligible accounts together. Account labels can be renamed from **Settings → Accounts** or the account submenu; each account’s email and workspace context are available from its **Details…** action. Individual failures leave the other accounts usable, and the menu labels cached readings as stale. If a read requires sign-in, use **Reauthenticate…** from account actions. **Settings…** can show a single window or the 5-hour and weekly windows together when Codex returns both for the same bucket. **Most allowance available** shows the account with the highest remaining percentage, comparing each account’s 5-hour reading or its weekly reading if the 5-hour window is absent. An asterisk marks a stale reading. Launch at login is off by default and uses macOS Login Items.
 
@@ -55,14 +57,15 @@ Codex stores each profile’s authentication inside its own private `CODEX_HOME`
 
 **Remove…** in a profile submenu asks for confirmation, cancels and reaps any active refresh, then removes the validated profile directory and its cached reading. To uninstall, turn off launch at login if enabled, quit the menu bar app, and move it to the Trash. Delete `~/Library/Application Support/Codex Usage` if you also want to discard all tracker profiles and cached readings.
 
-## Build and test
+## Build from source
 
 Install Xcode and XcodeGen (`brew install xcodegen`). In **Xcode → Settings → Accounts**, sign in with your Apple Account, select your team, then use **Manage Certificates** to create an **Apple Development** certificate. A free Personal Team is sufficient for a local build.
 
-From the repository root, run:
+Clone the repository and build Usage:
 
 ```sh
-cd apps/usage
+git clone https://github.com/an-mzn/micro-mac-apps.git
+cd micro-mac-apps/apps/usage
 security find-identity -v -p codesigning
 USAGE_SIGNING_IDENTITY='<SHA-1 shown next to your Apple Development certificate>' ./build.sh
 open dist/Usage.app
@@ -90,3 +93,14 @@ Apple M5 Pro, arm64, 64 GB RAM, macOS 27.2.1. CPU and RSS were sampled with `ps`
 | Idle scheduling and writes | Over the 10-second cached sample, 0 package-idle wakeups, 8 interrupt wakeups, 0 kernel-reported disk-write bytes, and no child. Opening the fresh cached menu left settings untouched until the manual refresh. |
 
 The steady-state observations are short samples. The timer, backoff, and request rules account for expected behavior over a full day. The fixture makes no network requests. The app had no connection row in the idle `nettop` sample. Authenticated refresh latency, child memory and network traffic, and long-run sleep and Low Power Mode behavior remain unmeasured.
+
+
+## Contributing
+
+Open an issue or submit a pull request against `main`. For bug reports, include the macOS version, the account provider, and steps to reproduce. Remove account identifiers, credentials, and sign-in codes from screenshots and logs before posting.
+
+From `apps/usage`, run `swift test` for the core tests. The project uses XcodeGen. Edit `project.yml` for project configuration changes and regenerate the Xcode project with `xcodegen generate`.
+
+## Licence
+
+Usage’s original source code and documentation are available under the [MIT licence](LICENSE). See [third-party asset notices](NOTICE.md) for the bundled provider logos. Other apps in this repository have their own licensing terms.
