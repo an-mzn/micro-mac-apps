@@ -255,7 +255,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         host.addSubview(row)
         NSLayoutConstraint.activate([
             row.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 17),
-            row.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -14),
+            row.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -20),
             row.centerYAnchor.constraint(equalTo: host.centerYAnchor),
             reset.widthAnchor.constraint(greaterThanOrEqualToConstant: 180)
         ])
