@@ -136,7 +136,7 @@ struct UsageWidget: Widget {
 }
 
 private struct UsageWidgetView: View {
-    private static let logo = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
+    private static let logo = Bundle.main.url(forResource: "usage", withExtension: "svg")
         .flatMap { NSImage(contentsOf: $0) }
 
     @Environment(\.colorScheme) private var colorScheme

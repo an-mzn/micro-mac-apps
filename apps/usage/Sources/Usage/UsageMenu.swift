@@ -442,7 +442,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private lazy var statusLogo: NSImage? = {
-        let image = Bundle.main.url(forResource: "codex-usage", withExtension: "svg")
+        let image = Bundle.main.url(forResource: "usage", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
             ?? NSImage(systemSymbolName: "speedometer", accessibilityDescription: "Usage")
         image?.size = NSSize(width: 18, height: 18)

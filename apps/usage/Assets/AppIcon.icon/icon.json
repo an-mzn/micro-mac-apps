@@ -9,7 +9,7 @@
       "layers": [
         {
           "name": "Cloud terminal refresh",
-          "image-name": "codex-usage.svg",
+          "image-name": "usage.svg",
           "fill-specializations": [
             { "value": { "solid": "srgb:0.86,0.89,0.92,1.0" } },
             { "appearance": "dark", "value": { "solid": "srgb:0.86,0.89,0.92,1.0" } }

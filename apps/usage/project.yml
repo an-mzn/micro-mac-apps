@@ -39,7 +39,7 @@ targets:
       - Sources/Usage
       - path: Assets/UsageDark.icns
         buildPhase: resources
-      - path: Assets/codex-usage.svg
+      - path: Assets/usage.svg
         buildPhase: resources
       - path: Assets/openai.svg
         buildPhase: resources
@@ -74,7 +74,7 @@ targets:
     platform: macOS
     sources:
       - Sources/UsageWidget
-      - path: Assets/codex-usage.svg
+      - path: Assets/usage.svg
         buildPhase: resources
       - path: Assets/openai.svg
         buildPhase: resources
