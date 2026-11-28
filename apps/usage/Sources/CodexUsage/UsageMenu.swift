@@ -308,7 +308,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             title.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             last.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 12),
             last.trailingAnchor.constraint(equalTo: shortcut.leadingAnchor, constant: -10),
-            shortcut.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -14),
+            shortcut.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -20),
             shortcut.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             last.centerYAnchor.constraint(equalTo: row.centerYAnchor)
         ])
