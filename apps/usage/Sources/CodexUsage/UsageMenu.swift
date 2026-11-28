@@ -12,6 +12,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private static let openAILogo = providerLogo(named: "openai")
+    private static let googleLogo = providerLogo(named: "google")
     private static let claudeLogo = providerLogo(named: "claude")
 
     private static func providerLogo(named name: String) -> NSImage? {
@@ -32,7 +33,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         ?? "7FVL4J2UZ9.com.an-mzn.codex-usage"
     private lazy var storage = makeStorage()
     private var config = Configuration()
-    private var claudeChecks: [UUID: Date] = [:]
+    private var snapshotChecks: [UUID: Date] = [:]
     private var widgetReloadPending = false
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
@@ -68,6 +69,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let fiveHour: WidgetAllowanceState
         let weekly: WidgetAllowanceState
         let resetCount: Int?
+        let googleQuotas: [Window]
     }
     private var jobs: [UUID: Job] = [:]
     private var refreshBatch: Set<UUID> = []
@@ -182,7 +184,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         if storageProblem { info("Could not read or save profile settings", in: menu) }
-        if cli == nil, config.profiles.contains(where: { $0.claudeSnapshotPath == nil }) {
+        if cli == nil, config.profiles.contains(where: { $0.localSnapshotPath == nil }) {
             info("Codex CLI unavailable · Select a binary in Settings", in: menu)
         }
         if config.profiles.isEmpty { info("No accounts connected", in: menu) }
@@ -193,7 +195,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
             let font = NSFont.menuFont(ofSize: 0)
             let title = NSMutableAttributedString()
-            if let logo = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo {
+            let logo = profile.antigravitySnapshotPath != nil
+                ? Self.googleLogo : (profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo)
+            if let logo {
                 let attachment = NSTextAttachment()
                 attachment.image = logo
                 attachment.bounds = CGRect(x: 0, y: -3, width: 14, height: 14)
@@ -203,7 +207,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             title.append(NSAttributedString(string: profile.label, attributes: [
                 .font: font, .foregroundColor: NSColor.labelColor
             ]))
-            if let snapshot = profile.snapshot, profile.claudeSnapshotPath == nil {
+            if let snapshot = profile.snapshot, profile.localSnapshotPath == nil {
                 title.append(NSAttributedString(string: "    "))
                 if let credits = accountCreditSummary(snapshot) {
                     title.append(NSAttributedString(string: "\(credits) • ", attributes: [
@@ -229,7 +233,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
             action("Account Details…", #selector(accountDetailsForMenu(_:)), in: manage, id: profile.id)
-            if profile.claudeSnapshotPath == nil {
+            if profile.localSnapshotPath == nil {
                 action("Reauthenticate…", #selector(reauthenticate(_:)), in: manage, id: profile.id)
             }
             action("Remove…", #selector(remove(_:)), in: manage, id: profile.id)
@@ -379,6 +383,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func shortWindowTitle(_ window: Window) -> String {
+        if window.bucketID == "antigravity" { return window.bucket }
         let duration: String
         switch window.minutes {
         case 300: duration = "5h"
@@ -487,7 +492,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 label: profile.label,
                 fiveHour: WidgetAllowanceState(remaining: fiveHour?.remaining, reset: fiveHour?.reset),
                 weekly: WidgetAllowanceState(remaining: weekly?.remaining, reset: weekly?.reset),
-                resetCount: profile.snapshot?.bankedResetCount
+                resetCount: profile.snapshot?.bankedResetCount,
+                googleQuotas: profile.antigravitySnapshotPath == nil ? [] : Array(windows.prefix(2))
             )
         }
     }
@@ -511,10 +517,10 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let now = Date()
         let codexAvailable = cli != nil
         let next = config.profiles.compactMap { profile -> Date? in
-            guard jobs[profile.id] == nil, profile.claudeSnapshotPath != nil || codexAvailable else { return nil }
+            guard jobs[profile.id] == nil, profile.localSnapshotPath != nil || codexAvailable else { return nil }
             if let failure = failures[profile.id] { return failure.retry == .distantFuture ? nil : failure.retry }
-            if profile.claudeSnapshotPath != nil {
-                return claudeChecks[profile.id]?.addingTimeInterval(interval) ?? now
+            if profile.localSnapshotPath != nil {
+                return snapshotChecks[profile.id]?.addingTimeInterval(interval) ?? now
             }
             guard let snapshot = profile.snapshot else { return now }
             let resets = snapshot.windows.compactMap(\.reset).filter { $0 > snapshot.at }
@@ -572,11 +578,14 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         guard !quitPending, jobs[id] == nil, afterJob[id] == nil,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         let binary = cli
-        guard profile.claudeSnapshotPath != nil || binary != nil else { return }
+        guard profile.localSnapshotPath != nil || binary != nil else { return }
         let job = Job(work: .refresh, status: "Loading allowance…")
         let client = binary.map { Client(binary: $0, storage: storage) }
-        if profile.claudeSnapshotPath != nil { claudeChecks[id] = Date() }
+        if profile.localSnapshotPath != nil { snapshotChecks[id] = Date() }
         start(id, job, perform: {
+            if let path = profile.antigravitySnapshotPath {
+                return (AntigravityStatus.identity, try AntigravityStatus.read(path: path))
+            }
             if let path = profile.claudeSnapshotPath {
                 return (ClaudeStatus.identity, try ClaudeStatus.read(path: path))
             }
@@ -606,7 +615,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     @objc private func refreshAll() {
-        guard cli != nil || config.profiles.contains(where: { $0.claudeSnapshotPath != nil }) else {
+        guard cli != nil || config.profiles.contains(where: { $0.localSnapshotPath != nil }) else {
             alert("CLI unavailable", "Select a Codex executable in Settings."); return
         }
         beginRefreshBatch(manual: true)
@@ -617,11 +626,11 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         let now = Date()
         let accounts = config.profiles.filter { profile in
             guard jobs[profile.id] == nil, afterJob[profile.id] == nil else { return false }
-            guard profile.claudeSnapshotPath != nil || cli != nil else { return false }
+            guard profile.localSnapshotPath != nil || cli != nil else { return false }
             if manual { return true }
             if let failure = failures[profile.id] { return failure.retry <= now }
-            if profile.claudeSnapshotPath != nil {
-                return claudeChecks[profile.id].map { now.timeIntervalSince($0) >= (maxAge ?? interval) } ?? true
+            if profile.localSnapshotPath != nil {
+                return snapshotChecks[profile.id].map { now.timeIntervalSince($0) >= (maxAge ?? interval) } ?? true
             }
             return profile.snapshot?.due(interval: maxAge ?? interval, now: now) != false
         }
@@ -632,24 +641,31 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         accounts.forEach { refresh($0.id) }
     }
 
-    @objc private func addClaude() {
-        guard let label = prompt("Add Claude Code Account", value: "Claude", button: "Choose Snapshot…") else { return }
+    @objc private func addClaude() { addSnapshotAccount(antigravity: false) }
+    @objc private func addAntigravity() { addSnapshotAccount(antigravity: true) }
+
+    private func addSnapshotAccount(antigravity: Bool) {
+        let provider = antigravity ? "Antigravity" : "Claude Code"
+        guard let label = prompt("Add \(provider) Account", value: provider, button: "Choose Snapshot…") else { return }
         let panel = NSOpenPanel()
-        panel.message = "Choose the JSON snapshot written by your Claude Code status line."
+        panel.message = "Choose the JSON snapshot written by your \(provider) status line."
         panel.canChooseDirectories = false
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let path = url.standardizedFileURL.path
-        guard !config.profiles.contains(where: { $0.claudeSnapshotPath == path }) else {
-            alert("Snapshot already connected", "Choose a separate snapshot file for each Claude account.")
+        guard !config.profiles.contains(where: { $0.localSnapshotPath == path }) else {
+            alert("Snapshot already connected", "Choose a separate snapshot file for each account.")
             return
         }
         do {
-            let profile = Profile(id: UUID(), label: label, identity: ClaudeStatus.identity,
-                                  snapshot: try ClaudeStatus.read(path: path), claudeSnapshotPath: path)
+            let snapshot = try antigravity ? AntigravityStatus.read(path: path) : ClaudeStatus.read(path: path)
+            let profile = Profile(id: UUID(), label: label,
+                                  identity: antigravity ? AntigravityStatus.identity : ClaudeStatus.identity,
+                                  snapshot: snapshot, claudeSnapshotPath: antigravity ? nil : path,
+                                  antigravitySnapshotPath: antigravity ? path : nil)
             change { $0.profiles.append(profile) }
         } catch {
-            alert("Could not read Claude limits", "Choose a snapshot with a 5-hour or weekly reading from Claude Code.")
+            alert("Could not read \(provider) limits", "Choose a status line snapshot containing a reported quota percentage.")
         }
     }
 
@@ -693,7 +709,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     private func reauthenticateProfile(_ id: UUID) {
         guard loginID == nil, jobs[id]?.work != .remove,
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
-        guard profile.claudeSnapshotPath == nil else { return }
+        guard profile.localSnapshotPath == nil else { return }
         beginLogin(id, label: profile.label, existing: true)
     }
 
@@ -862,16 +878,16 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
               let profile = config.profiles.first(where: { $0.id == id }) else { return }
         let dialog = NSAlert()
         dialog.messageText = "Are you sure you want to remove \(profile.label)?"
-        dialog.informativeText = profile.claudeSnapshotPath == nil
+        dialog.informativeText = profile.localSnapshotPath == nil
             ? "This deletes the tracker’s cached allowance and its private Codex sign-in."
-            : "This removes the account from Usage. Your Claude Code snapshot file stays on disk."
+            : "This removes the account from Usage. Your snapshot file stays on disk."
         dialog.addButton(withTitle: "Cancel")
         dialog.addButton(withTitle: "Remove").hasDestructiveAction = true
         NSApp.activate(ignoringOtherApps: true)
         guard dialog.runModal() == .alertSecondButtonReturn else { return }
         afterCurrentWork(id) {
             let job = Job(work: .remove, status: "Removing…")
-            self.start(id, job, perform: { if profile.claudeSnapshotPath == nil { try self.storage.remove(id) } }) { result in
+            self.start(id, job, perform: { if profile.localSnapshotPath == nil { try self.storage.remove(id) } }) { result in
                 do {
                     try result.get()
                     var next = self.config
@@ -883,7 +899,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                     }
                     try self.commit(next)
                     self.failures.removeValue(forKey: id)
-                    self.claudeChecks.removeValue(forKey: id)
+                    self.snapshotChecks.removeValue(forKey: id)
                 } catch {
                     if !self.quitPending { self.alert("Could not remove account", error.localizedDescription) }
                 }
@@ -1104,7 +1120,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
     }
 
     private func fillAccountSettings(_ stack: NSStackView) {
-        let intro = NSTextField(labelWithString: "Manage connected Codex and Claude Code accounts.")
+        let intro = NSTextField(labelWithString: "Manage Codex, Claude Code, and Google Antigravity accounts.")
         intro.textColor = .secondaryLabelColor
         let refresh = NSButton(title: "Refresh All", target: self, action: #selector(refreshAll))
         refresh.keyEquivalent = "r"
@@ -1126,7 +1142,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 profileButton("Details…", selector: #selector(accountDetailsForButton(_:)), id: profile.id),
                 profileButton("Remove…", selector: #selector(removeProfileButton(_:)), id: profile.id)
             ]
-            if profile.claudeSnapshotPath == nil {
+            if profile.localSnapshotPath == nil {
                 accountActions.insert(profileButton("Reauthenticate…", selector: #selector(reauthenticateProfileButton(_:)), id: profile.id), at: 2)
             }
             let actions = NSStackView(views: accountActions)
@@ -1157,7 +1173,8 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             return row
         }
         let addClaudeAccount = NSButton(title: "Add Claude Account…", target: self, action: #selector(addClaude))
-        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, details]
+        let addGoogleAccount = NSButton(title: "Add Antigravity Account…", target: self, action: #selector(addAntigravity))
+        var content: [NSView] = [intro, refresh, addAccount, addClaudeAccount, addGoogleAccount, details]
         if !rows.isEmpty {
             let divider = NSBox()
             divider.boxType = .separator

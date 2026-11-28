@@ -45,6 +45,8 @@ targets:
         buildPhase: resources
       - path: Assets/claude.svg
         buildPhase: resources
+      - path: Assets/google.svg
+        buildPhase: resources
     dependencies:
       - target: UsageCore
       - target: CodexUsageWidget
@@ -59,7 +61,7 @@ targets:
       properties:
         CFBundleDisplayName: Usage
         CFBundleIconFile: UsageDark.icns
-        CFBundleVersion: "45"
+        CFBundleVersion: "46"
         CFBundleName: Usage
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
@@ -75,11 +77,13 @@ targets:
         buildPhase: resources
       - path: Assets/claude.svg
         buildPhase: resources
+      - path: Assets/google.svg
+        buildPhase: resources
     info:
       path: Widget-Info.plist
       properties:
         CFBundleDisplayName: Usage
-        CFBundleVersion: "45"
+        CFBundleVersion: "46"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     dependencies:

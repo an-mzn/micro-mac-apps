@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		01274551E845605B3EEC4EF5 /* openai.svg in Resources */ = {isa = PBXBuildFile; fileRef = 82F759E49C51BFDDBB2D020A /* openai.svg */; };
 		198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */ = {isa = PBXBuildFile; fileRef = 483FFECF96BC256973FF108F /* codex-usage.svg */; };
+		2381EFE3045C8EEAD7D24C14 /* google.svg in Resources */ = {isa = PBXBuildFile; fileRef = 0E3D34443682F0EE3104237C /* google.svg */; };
 		2E785F238E3D570BB34C4846 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
 		3F2D10ABC077C2CDEFE40D8B /* claude.svg in Resources */ = {isa = PBXBuildFile; fileRef = 5EAF315AEAB4C24786E2782D /* claude.svg */; };
 		4757B1560A531E6E905CC2D8 /* UsageMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42C7DF564F33A6868893451 /* UsageMenu.swift */; };
@@ -16,8 +17,10 @@
 		62D7CFA9AC9E92EF6D15D728 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D493C25C602897BC1EEC4FF /* Models.swift */; };
 		63C59D6CFD898833F0CCDE77 /* UsageCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02714327538B991E2F2F7FA /* UsageCoreTests.swift */; };
 		8765EFAE6B80C954CA18DC17 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
+		87B2B94E3650C75699D9E103 /* google.svg in Resources */ = {isa = PBXBuildFile; fileRef = 0E3D34443682F0EE3104237C /* google.svg */; };
 		8DFEF03A4A1335C9F1E7E683 /* codex-usage.svg in Resources */ = {isa = PBXBuildFile; fileRef = 483FFECF96BC256973FF108F /* codex-usage.svg */; };
 		8E47E82A84A88B7E46E91E51 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABAB99EA47A02B6120B7365E /* Storage.swift */; };
+		989F3D1948CB3BD46CF83D21 /* AntigravityStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F120F78961D099AFBA10D757 /* AntigravityStatus.swift */; };
 		9B23643E492041D9B2FE8487 /* CodexUsageWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A98E08F7F102EA0D9CDCC94F /* CodexUsageWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9CD55AB3218C473F7C759F55 /* UsageCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; };
 		AC4395C7B4179E75798A4EE1 /* claude.svg in Resources */ = {isa = PBXBuildFile; fileRef = 5EAF315AEAB4C24786E2782D /* claude.svg */; };
@@ -98,6 +101,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0E3D34443682F0EE3104237C /* google.svg */ = {isa = PBXFileReference; path = google.svg; sourceTree = "<group>"; };
 		1E4CAFC9B7718C5BE1E5BEFF /* UsageDark.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = UsageDark.icns; sourceTree = "<group>"; };
 		2A99A6A259A28AFA09539FA3 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
 		2D493C25C602897BC1EEC4FF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -111,6 +115,7 @@
 		BCC07F1E75534D479BFD25B6 /* CodexUsage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodexUsage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C02714327538B991E2F2F7FA /* UsageCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCoreTests.swift; sourceTree = "<group>"; };
 		E386A19ADA12E73A4B329453 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		F120F78961D099AFBA10D757 /* AntigravityStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityStatus.swift; sourceTree = "<group>"; };
 		F2C1796C7C76809178519A27 /* ClaudeStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatus.swift; sourceTree = "<group>"; };
 		F42C7DF564F33A6868893451 /* UsageMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMenu.swift; sourceTree = "<group>"; };
 		F8D6E0222484CB5755EA1F58 /* UsageCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UsageCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -185,6 +190,7 @@
 			children = (
 				5EAF315AEAB4C24786E2782D /* claude.svg */,
 				483FFECF96BC256973FF108F /* codex-usage.svg */,
+				0E3D34443682F0EE3104237C /* google.svg */,
 				82F759E49C51BFDDBB2D020A /* openai.svg */,
 				1E4CAFC9B7718C5BE1E5BEFF /* UsageDark.icns */,
 			);
@@ -194,6 +200,7 @@
 		AA494D36C737FE5BBF617D2C /* UsageCore */ = {
 			isa = PBXGroup;
 			children = (
+				F120F78961D099AFBA10D757 /* AntigravityStatus.swift */,
 				F2C1796C7C76809178519A27 /* ClaudeStatus.swift */,
 				2A99A6A259A28AFA09539FA3 /* Client.swift */,
 				2D493C25C602897BC1EEC4FF /* Models.swift */,
@@ -369,6 +376,7 @@
 			files = (
 				3F2D10ABC077C2CDEFE40D8B /* claude.svg in Resources */,
 				8DFEF03A4A1335C9F1E7E683 /* codex-usage.svg in Resources */,
+				87B2B94E3650C75699D9E103 /* google.svg in Resources */,
 				01274551E845605B3EEC4EF5 /* openai.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -380,6 +388,7 @@
 				B90BFA79320E680830BE8EA5 /* UsageDark.icns in Resources */,
 				AC4395C7B4179E75798A4EE1 /* claude.svg in Resources */,
 				198008A33C37B69ED6DF70F5 /* codex-usage.svg in Resources */,
+				2381EFE3045C8EEAD7D24C14 /* google.svg in Resources */,
 				DE1E05BD5D94D0A8D5D049A8 /* openai.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -399,6 +408,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				989F3D1948CB3BD46CF83D21 /* AntigravityStatus.swift in Sources */,
 				F46A81FF85318F22C131ED83 /* ClaudeStatus.swift in Sources */,
 				E57E17D635ED0C7E7DD52F1A /* Client.swift in Sources */,
 				62D7CFA9AC9E92EF6D15D728 /* Models.swift in Sources */,

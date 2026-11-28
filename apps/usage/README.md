@@ -1,6 +1,6 @@
 # Usage
 
-Usage is a native macOS menu bar app and widget for tracking remaining Codex and Claude Code allowance across accounts. It shows the last successful reading for each profile.
+Usage is a native macOS menu bar app and widget for tracking remaining Codex, Claude Code, and Google Antigravity allowance across accounts. It shows the last successful reading for each profile.
 
 [MIT licence](LICENSE) · [Build from source](#build-from-source) · [Contributing](#contributing)
 
@@ -44,6 +44,27 @@ select the generated JSON. Use a separate Claude Code configuration and
 snapshot path for each account. The snapshot contains only the reported
 percentages and reset timestamps. **Refresh All** rereads the file, and removing
 the account from Usage leaves your Claude Code settings and file in place.
+
+## Connect Google Antigravity
+
+Usage reads Gemini and other model quota buckets exposed by the
+[Antigravity CLI status line](https://antigravity.google/docs/cli/statusline/).
+Install `jq`, then run this command inside Antigravity with your own absolute paths:
+
+```text
+/statusline /bin/bash '/absolute/path/to/scripts/antigravity-statusline.sh' '/absolute/path/to/google-personal.json'
+```
+
+Once Antigravity reports quotas, choose **Settings → Accounts → Add Antigravity Account…**
+in Usage and select the generated JSON file. Use a separate snapshot path for
+each account. The menu shows all reported percentage buckets. Widgets show up
+to two per account. **Refresh All** rereads the local file; Antigravity controls
+when new quota data becomes available.
+
+The helper exports bucket IDs, fractions, and reset times only. It skips
+disabled buckets and buckets reported solely as amounts. This integration
+covers the Antigravity CLI and its model quotas. Gemini web, AI Studio, Gemini
+API projects, and standalone Gemini CLI do not use this integration.
 
 ## Refresh and settings
 

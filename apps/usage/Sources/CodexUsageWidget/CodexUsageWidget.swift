@@ -17,6 +17,8 @@ private struct AccountReading: Identifiable {
     let id: UUID
     let label: String
     let isClaude: Bool
+    let isAntigravity: Bool
+    let quotas: [Allowance]
     let fiveHour: Allowance?
     let weekly: Allowance?
     let resetCount: Int?
@@ -25,8 +27,12 @@ private struct AccountReading: Identifiable {
         id = profile.id
         label = profile.label
         isClaude = profile.claudeSnapshotPath != nil
+        isAntigravity = profile.antigravitySnapshotPath != nil
         resetCount = profile.snapshot?.bankedResetCount
         let windows = profile.snapshot?.windows ?? []
+        quotas = isAntigravity ? windows.prefix(2).map {
+            Allowance(id: $0.id, title: $0.bucket, remaining: $0.remaining, reset: $0.reset)
+        } : []
         fiveHour = windows.first(where: { $0.minutes == 300 }).map {
             Allowance(id: $0.id, title: "5h", remaining: $0.remaining, reset: $0.reset)
         }
@@ -38,6 +44,8 @@ private struct AccountReading: Identifiable {
         self.id = id
         self.label = label
         self.isClaude = false
+        self.isAntigravity = false
+        self.quotas = []
         self.fiveHour = fiveHour
         self.weekly = weekly
         self.resetCount = nil
@@ -85,7 +93,7 @@ private struct UsageProvider: TimelineProvider {
         var dates = Set<Date>()
         var hasLaterChanges = false
         for account in entry.accounts.prefix(3) {
-            for reset in [account.fiveHour?.reset, account.weekly?.reset].compactMap({ $0 }) {
+            for reset in ([account.fiveHour?.reset, account.weekly?.reset] + account.quotas.map(\.reset)).compactMap({ $0 }) {
                 var date = entry.date
                 while let boundary = ResetCountdown.nextChange(reset: reset, after: date), boundary > date {
                     guard boundary <= horizon else {
@@ -146,7 +154,13 @@ private struct UsageWidgetView: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            if let account = entry.accounts.first {
+            if let account = entry.accounts.first, account.isAntigravity {
+                VStack(alignment: .leading, spacing: 6) {
+                    accountName(account, size: 13)
+                    quotaSummary(account)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else if let account = entry.accounts.first {
                 HStack(alignment: .center, spacing: 16) {
                     SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
@@ -171,13 +185,17 @@ private struct UsageWidgetView: View {
                     ForEach(Array(entry.accounts.prefix(3))) { account in
                         VStack(alignment: .leading, spacing: 5) {
                             accountName(account, size: 12)
-                            HStack(spacing: 5) {
-                                SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 30)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    if account.fiveHour != nil {
-                                        compactAllowance(account.fiveHour, title: "5h")
+                            if account.isAntigravity {
+                                quotaSummary(account)
+                            } else {
+                                HStack(spacing: 5) {
+                                    SplitAllowanceRing(fiveHour: account.fiveHour, weekly: account.weekly, size: 30)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        if account.fiveHour != nil {
+                                            compactAllowance(account.fiveHour, title: "5h")
+                                        }
+                                        compactAllowance(account.weekly, title: "Wk")
                                     }
-                                    compactAllowance(account.weekly, title: "Wk")
                                 }
                             }
                         }
@@ -210,10 +228,16 @@ private struct UsageWidgetView: View {
                                 }
                             }
                             .frame(width: 58, alignment: .leading)
-                            if let fiveHour = account.fiveHour {
-                                allowanceColumn(fiveHour, title: "5 hours")
+                            if account.isAntigravity {
+                                ForEach(account.quotas) { quota in
+                                    allowanceColumn(quota, title: quota.title)
+                                }
+                            } else {
+                                if let fiveHour = account.fiveHour {
+                                    allowanceColumn(fiveHour, title: "5 hours")
+                                }
+                                allowanceColumn(account.weekly, title: "Weekly")
                             }
-                            allowanceColumn(account.weekly, title: "Weekly")
                         }
                         .frame(height: 76)
                         if account.id != entry.accounts.prefix(3).last?.id {
@@ -230,7 +254,28 @@ private struct UsageWidgetView: View {
             }
         }.padding(16)
     }
+    private func quotaSummary(_ account: AccountReading) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(account.quotas) { quota in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(quota.title)
+                        .lineLimit(1).truncationMode(.middle)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text("\(quota.remaining)%").fontWeight(.semibold)
+                        if let reset = quota.reset {
+                            Text(resetTimeLeft(reset)).foregroundStyle(.secondary)
+                        }
+                    }
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                }
+            }
+        }
+        .font(.system(size: 10))
+    }
+
     private static let openAILogo = providerLogo("openai")
+    private static let googleLogo = providerLogo("google")
     private static let claudeLogo = providerLogo("claude")
 
     private static func providerLogo(_ name: String) -> NSImage? {
@@ -240,7 +285,8 @@ private struct UsageWidgetView: View {
 
     private func accountName(_ account: AccountReading, size: CGFloat) -> some View {
         HStack(spacing: 4) {
-            if let logo = account.isClaude ? Self.claudeLogo : Self.openAILogo {
+            let logo = account.isAntigravity ? Self.googleLogo : (account.isClaude ? Self.claudeLogo : Self.openAILogo)
+            if let logo {
                 Image(nsImage: logo)
                     .renderingMode(.template)
                     .resizable()
@@ -315,7 +361,7 @@ private struct UsageWidgetView: View {
     }
     private func allowanceColumn(_ allowance: Allowance?, title: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
+            Text(title.uppercased()).lineLimit(1).truncationMode(.middle)
                 .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.9))
             if let allowance {
                 Text("\(allowance.remaining)% left")
