@@ -172,12 +172,14 @@ public struct Profile: Codable, Equatable, Identifiable {
     public let id: UUID
     public var label: String
     public var identity: Identity
+    public var claudeSnapshotPath: String?
     public var snapshot: Snapshot?
 
-    public init(id: UUID, label: String, identity: Identity, snapshot: Snapshot? = nil) {
+    public init(id: UUID, label: String, identity: Identity, snapshot: Snapshot? = nil, claudeSnapshotPath: String? = nil) {
         self.id = id
         self.label = label
         self.identity = identity
+        self.claudeSnapshotPath = claudeSnapshotPath
         self.snapshot = snapshot
     }
 }

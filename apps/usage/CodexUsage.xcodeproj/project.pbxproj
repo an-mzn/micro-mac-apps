@@ -23,6 +23,7 @@
 		BAEE1554BC5C925F3B5A191F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = E386A19ADA12E73A4B329453 /* main.swift */; };
 		D12859F20843D875373CCEB0 /* UsageCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9187E8A074F560C613ED393F /* UsageCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E57E17D635ED0C7E7DD52F1A /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A99A6A259A28AFA09539FA3 /* Client.swift */; };
+		F46A81FF85318F22C131ED83 /* ClaudeStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C1796C7C76809178519A27 /* ClaudeStatus.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -104,6 +105,7 @@
 		BCC07F1E75534D479BFD25B6 /* CodexUsage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodexUsage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C02714327538B991E2F2F7FA /* UsageCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCoreTests.swift; sourceTree = "<group>"; };
 		E386A19ADA12E73A4B329453 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		F2C1796C7C76809178519A27 /* ClaudeStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatus.swift; sourceTree = "<group>"; };
 		F42C7DF564F33A6868893451 /* UsageMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMenu.swift; sourceTree = "<group>"; };
 		F8D6E0222484CB5755EA1F58 /* UsageCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UsageCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -184,6 +186,7 @@
 		AA494D36C737FE5BBF617D2C /* UsageCore */ = {
 			isa = PBXGroup;
 			children = (
+				F2C1796C7C76809178519A27 /* ClaudeStatus.swift */,
 				2A99A6A259A28AFA09539FA3 /* Client.swift */,
 				2D493C25C602897BC1EEC4FF /* Models.swift */,
 				ABAB99EA47A02B6120B7365E /* Storage.swift */,
@@ -384,6 +387,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F46A81FF85318F22C131ED83 /* ClaudeStatus.swift in Sources */,
 				E57E17D635ED0C7E7DD52F1A /* Client.swift in Sources */,
 				62D7CFA9AC9E92EF6D15D728 /* Models.swift in Sources */,
 				8E47E82A84A88B7E46E91E51 /* Storage.swift in Sources */,

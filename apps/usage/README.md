@@ -6,13 +6,42 @@ A native menu bar app for comparing ChatGPT-backed Codex allowance across accoun
 
 Build **Usage.app** using the instructions below, then open it from `dist/` or move it to Applications. Look for the refresh icon in the menu bar. The app runs without a Dock icon. The local build uses your Apple Development certificate and is unnotarized. The package targets macOS 14 or later.
 
-1. Open **Settings → Accounts** and choose **Add Account…**. Enter a label such as Personal.
+1. Open **Settings → Accounts** and choose **Add Codex Account…**. Enter a label such as Personal.
 2. Choose **Open Verification Page**, sign in to the intended ChatGPT account or workspace, and enter the one-time code shown in the app. If your browser already has another account open, use the account chooser or a separate browser profile. The app reads the account context from Codex before adding the profile.
 3. Repeat with a different label for the second account or workspace. Device code authorization must be enabled for the account and allowed by its workspace. If necessary, enable it in ChatGPT security settings.
 
 The app checks for the CLI bundled in ChatGPT, then checks absolute PATH entries, Homebrew, and common user install locations. Choose a different executable in **Settings…**. The minimum verified CLI is **codex-cli 0.171.0-alpha.13.2** (bundled with ChatGPT on the test Mac). Other builds need the documented stdio handshake with `codexHome`, account reads, and ChatGPT device-code login. Older builds were not tested. [Codex App Server documentation](https://developers.openai.com/codex/app-server)
 
 The **Codex executable** setting is the path to the Codex command-line program (`codex`) that the app launches in the background to sign in and read allowance. Automatic discovery is the recommended setting. Choose a binary only if the app cannot find your Codex installation or you want to use another supported version.
+
+## Connect Claude Code
+
+Usage can show Claude Code’s 5-hour and weekly subscription limits alongside
+Codex accounts. Claude supplies these readings through its
+[status line](https://code.claude.com/docs/en/statusline) after a response.
+Usage reads the latest saved snapshot locally, so limits can remain stale
+until Claude Code reports new figures.
+
+Install `jq` (for example, `brew install jq`). In the Claude Code settings for
+the account or configuration you want to track, set the status line command.
+Use absolute paths:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "/bin/bash '/absolute/path/to/scripts/claude-statusline.sh' '/absolute/path/to/claude-personal.json'"
+  }
+}
+```
+
+If you already use a custom status line, call this helper from it with the same
+JSON input and discard the helper’s output. After Claude reports limits, open
+**Usage → Settings → Accounts → Add Claude Account…**, give it a label, and
+select the generated JSON. Use a separate Claude Code configuration and
+snapshot path for each account. The snapshot contains only the reported
+percentages and reset timestamps. **Refresh All** rereads the file, and removing
+the account from Usage leaves your Claude Code settings and file in place.
 
 ## Refresh and settings
 
