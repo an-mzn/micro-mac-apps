@@ -151,9 +151,13 @@ public struct Snapshot: Codable, Equatable {
     }
 
     public func hasBankedResetExpiringSoon(now: Date = Date()) -> Bool {
-        guard let count = bankedResetCount, count > 0 else { return false }
+        nextBankedResetExpiringSoon(now: now) != nil
+    }
+
+    public func nextBankedResetExpiringSoon(now: Date = Date()) -> Date? {
+        guard let count = bankedResetCount, count > 0 else { return nil }
         let deadline = now.addingTimeInterval(72 * 60 * 60)
-        return bankedResetExpirations?.contains { $0 > now && $0 <= deadline } == true
+        return bankedResetExpirations?.filter { $0 > now && $0 <= deadline }.min()
     }
 
     public func due(interval: TimeInterval, now: Date = Date()) -> Bool {

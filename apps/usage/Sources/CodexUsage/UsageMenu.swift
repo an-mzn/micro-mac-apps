@@ -180,10 +180,17 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                         .font: font, .foregroundColor: NSColor.tertiaryLabelColor
                     ]))
                 }
-                let expiresSoon = snapshot.hasBankedResetExpiringSoon()
+                let now = Date()
+                let expiration = snapshot.nextBankedResetExpiringSoon(now: now)
+                let expiresSoon = expiration != nil
+                var resetText = resetSummary(snapshot.bankedResetCount)
+                if let expiration {
+                    let days = expiration.timeIntervalSince(now) / 86_400
+                    resetText += " → " + days.formatted(.number.precision(.fractionLength(1))) + "d"
+                }
                 let resetColor = expiresSoon ? Self.expiringResetColor : NSColor.tertiaryLabelColor
                 let resetFont = expiresSoon ? NSFont.systemFont(ofSize: font.pointSize, weight: .semibold) : font
-                title.append(NSAttributedString(string: resetSummary(snapshot.bankedResetCount), attributes: [
+                title.append(NSAttributedString(string: resetText, attributes: [
                     .font: resetFont, .foregroundColor: resetColor
                 ]))
                 header.attributedTitle = title
