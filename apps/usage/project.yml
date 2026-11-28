@@ -59,7 +59,7 @@ targets:
       properties:
         CFBundleDisplayName: Usage
         CFBundleIconFile: UsageDark.icns
-        CFBundleVersion: "35"
+        CFBundleVersion: "36"
         CFBundleName: Usage
         LSMinimumSystemVersion: "14.0"
         LSUIElement: true
@@ -75,7 +75,7 @@ targets:
       path: Widget-Info.plist
       properties:
         CFBundleDisplayName: Usage
-        CFBundleVersion: "35"
+        CFBundleVersion: "36"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     dependencies:

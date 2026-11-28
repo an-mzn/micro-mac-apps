@@ -188,11 +188,20 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
             menu.addItem(.separator())
             let manage = NSMenu()
             let header = NSMenuItem(title: profile.label, action: nil, keyEquivalent: "")
+            let font = NSFont.menuFont(ofSize: 0)
+            let title = NSMutableAttributedString()
+            if let logo = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo {
+                let attachment = NSTextAttachment()
+                attachment.image = logo
+                attachment.bounds = CGRect(x: 0, y: -2, width: 14, height: 14)
+                title.append(NSAttributedString(attachment: attachment))
+                title.append(NSAttributedString(string: "  "))
+            }
+            title.append(NSAttributedString(string: profile.label, attributes: [
+                .font: font, .foregroundColor: NSColor.labelColor
+            ]))
             if let snapshot = profile.snapshot, profile.claudeSnapshotPath == nil {
-                let font = NSFont.menuFont(ofSize: 0)
-                let title = NSMutableAttributedString(string: "\(profile.label)    ", attributes: [
-                    .font: font, .foregroundColor: NSColor.labelColor
-                ])
+                title.append(NSAttributedString(string: "    "))
                 if let credits = accountCreditSummary(snapshot) {
                     title.append(NSAttributedString(string: "\(credits) • ", attributes: [
                         .font: font, .foregroundColor: NSColor.tertiaryLabelColor
@@ -211,10 +220,9 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
                 title.append(NSAttributedString(string: resetText, attributes: [
                     .font: resetFont, .foregroundColor: resetColor
                 ]))
-                header.attributedTitle = title
             }
+            header.attributedTitle = title
             header.submenu = manage
-            header.image = profile.claudeSnapshotPath == nil ? Self.openAILogo : Self.claudeLogo
             menu.addItem(header)
             action("Rename…", #selector(rename(_:)), in: manage, id: profile.id)
             action("Account Details…", #selector(accountDetailsForMenu(_:)), in: manage, id: profile.id)
@@ -325,7 +333,7 @@ final class UsageMenu: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFi
         last.translatesAutoresizingMaskIntoConstraints = false
         shortcut.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            title.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 14),
+            title.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 16),
             title.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             last.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 12),
             last.trailingAnchor.constraint(equalTo: shortcut.leadingAnchor, constant: -10),
